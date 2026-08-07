@@ -19,3 +19,31 @@ Stage 0 uses a JSON viewport query. This is a replaceable boundary. Vector tiles
 ## A-005 Backend implementation
 
 The prototype backend uses Node.js, TypeScript, and Fastify to share contracts with the frontend. This does not define the production backend technology.
+
+## A-006 Catalog delivery
+
+The MVP initially transfers the stable catalog as one versioned document for the selected building or floors. Tens-of-thousands-scale metadata is expected to be cacheable and compressible. Pagination or binary encoding is added only if data-stage measurements justify it.
+
+## A-007 Actor identity
+
+Production authentication and authorization are out of scope. `requestedBy`, `acknowledgedBy`, and `confirmedBy` contain explicit mock actor IDs and must not be treated as trusted identity claims.
+
+## A-008 Realtime ordering
+
+Realtime sequence numbers are monotonically increasing within one building stream. A changed `streamId` means the previous cursor cannot be assumed valid and requires an authoritative snapshot.
+
+## A-009 Snapshot authority
+
+The HTTP hot-state snapshot is authoritative for telemetry, alarms, commands, and the realtime cursor. It atomically replaces those stores; it does not repeat stable catalog metadata or plan geometry.
+
+## A-010 Command execution
+
+All MVP commands are simulated. Backend command state and actual telemetry are separate, and an `executed` command does not by itself prove that the requested physical value is currently observed.
+
+## A-011 Binding safety
+
+A device binding is an opaque adapter or simulator reference with explicit provenance. It contains no credentials. Synthetic references remain marked `synthetic` and are never presented as addresses extracted from IFC.
+
+## A-012 Wire timestamps and nullable fields
+
+Wire timestamps use ISO 8601 strings with an explicit UTC offset. Lifecycle audit fields use explicit `null` before they occur, producing stable object shapes for snapshots and upserts.

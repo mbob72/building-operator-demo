@@ -1,35 +1,115 @@
-# Stage 0 architecture
+# Architecture
+
+## System boundaries
 
 ```text
-Orthographic viewer
-       |
-       | floorId + bbox + zoom + pixel size
-       v
-POST /api/scene/query
-       |
-       +-- request validation
-       +-- floor lookup
-       +-- bbox intersection
-       +-- zoom-range filtering
-       v
-Scene response -> PolygonLayer / PathLayer / TextLayer
+Offline IFC/data pipeline
+        -> prepared plan geometry + stable device catalog
+
+React application shell
+        -> query cache for catalog and other stable server documents
+        -> Zustand UI state for view, filters, selection, and command drafts
+        -> indexed hot store for telemetry, alarms, commands, and stream cursor
+        -> deck.gl rendering adapter for stable positions + dirty visual attributes
+
+Unified backend boundary
+        -> REST catalog, snapshot, acknowledge, and command endpoints
+        -> WebSocket ordered event stream
+        -> mock simulator now; replaceable production backend later
 ```
 
-## Boundaries
+The browser never receives raw IFC or protocol-specific frames and never talks directly to physical-system gateways.
 
-- `src/shared`: runtime-validatable transport contracts.
-- `src/server`: prepared-scene loading, spatial filtering, HTTP endpoints.
-- `scripts/data-pipeline`: reproducible IFC download and horizontal-section extraction.
-- `data/generated`: compact browser-independent scene artifact.
-- `src/client`: view state, viewport conversion, API client, WebGL layers.
-- `contracts`: backend-independent JSON Schema representation.
+## State ownership
 
-## Request lifecycle
+| State class | Canonical examples | Frontend owner | Update pattern |
+| --- | --- | --- | --- |
+| Plan scene | walls, doors, labels, floor bounds | scene query cache / deck.gl layers | viewport and zoom query |
+| Stable metadata | device name, type, protocol, floor, position, capabilities | TanStack Query catalog cache | versioned snapshot/invalidation |
+| Hot operational state | telemetry, status, connection, alarms, command records | indexed external store keyed by ID | ordered batched deltas or full replacement |
+| UI-only state | selected floor/device, filters, view state, panels, command draft | Zustand | local user interaction |
+| Renderer state | stable instance order, icon/color/size attributes, dirty indices | WebGL subsystem | controlled frame cadence |
 
-The viewer maintains an orthographic `target` and `zoom`. It derives the visible bbox from target, viewport dimensions, and scale. View changes are debounced for 100 ms. The server returns only features whose bbox intersects the requested bbox and whose zoom range contains the requested zoom.
+Transport arrays are indexed once on ingestion. A telemetry event must not recreate the complete device metadata array or trigger a React render for every device.
 
-The 1,062 prepared features are currently scanned linearly. A spatial index is intentionally deferred until all selected floors and disciplines exist and can be benchmarked together.
+## Domain relationships
 
-## Large object rendering
+```text
+Building 1 -> many Floors
+Floor    1 -> many DeviceMetadata
+Device   1 -> latest DeviceTelemetry
+Device   1 -> many Alarms
+Device   1 -> many CommandRecords
 
-Device rendering and realtime update guardrails are defined in [`rendering-guidelines.md`](rendering-guidelines.md) and [ADR-0002](adr/0002-many-object-rendering.md). In particular, spatial indexing, clustering, workers, and CPU viewport culling are benchmark-driven additions rather than mandatory prerequisites for a tens-of-thousands-scale instanced point layer.
+DeviceMetadata.binding.dataOrigin
+        -> ifc | derived | synthetic
+```
+
+`roomId` is nullable. Position is in floor-local Cartesian metres and is stable for a catalog version.
+
+## REST contract
+
+All new operational endpoints use `/api/v1`. The Stage 0 `/api/scene/query` endpoint remains unchanged until a separately approved migration.
+
+| Method and path | Purpose | Contract |
+| --- | --- | --- |
+| `GET /api/v1/catalog?buildingId&floorId*` | Cacheable stable building/floor/device metadata | `CatalogQuery` -> `CatalogResponse` |
+| `GET /api/v1/state/snapshot?buildingId&floorId*` | Authoritative hot-state replacement and stream cursor | `StateSnapshotQuery` -> `StateSnapshot` |
+| `POST /api/v1/alarms/:alarmId/acknowledge` | Idempotent alarm acknowledgement | `AcknowledgeAlarmRequest` -> `AcknowledgeAlarmResponse` |
+| `POST /api/v1/commands` | Idempotent simulated command creation | `CreateCommandRequest` -> `CreateCommandResponse` |
+| `GET /api/v1/commands/:commandId` | Command status fallback when realtime is unavailable | `CommandResponse` |
+| `GET /api/v1/realtime` with WebSocket upgrade | Ordered realtime events | realtime client/server message unions |
+
+Successful catalog responses expose `catalogVersion` and should use an HTTP `ETag`. Errors use `ApiError`. Authentication is intentionally out of scope; `requestedBy` and `acknowledgedBy` are mock actor IDs, not trusted identity claims.
+
+## Snapshot and realtime lifecycle
+
+```text
+connect WebSocket
+  -> subscribe(buildingId, optional floorIds)
+  <- hello(streamId, latestSequence, retentionStartSequence)
+  -> GET state/snapshot
+  <- snapshot(streamId, sequence, full hot state)
+  -> resume(streamId, afterSequence = snapshot.sequence)
+  <- event.batch with contiguous sequences
+
+reconnect
+  -> resume(last streamId, last applied sequence)
+  <- replayed event.batch
+     or resync.required -> replace from HTTP snapshot -> resume
+```
+
+The client applies a batch only in ascending contiguous sequence order. Duplicates at or below the applied cursor are ignored. A gap is not guessed over. Telemetry updates also carry a per-device revision so late values for one device cannot overwrite newer state.
+
+The HTTP snapshot is authoritative and replaces telemetry, alarm, command, stream ID, and cursor atomically. Stable metadata is not repeated in the hot snapshot.
+
+## Alarm lifecycle
+
+```text
+active -> acknowledged -> resolved
+active ----------------> resolved
+```
+
+Acknowledged alarms require `acknowledgedAt` and `acknowledgedBy`; resolved alarms require `resolvedAt`. An upsert event carries the complete alarm record because alarm volume is much lower than telemetry volume and lifecycle correctness is more important than field-level compression.
+
+## Command lifecycle
+
+```text
+UI only: draft
+transport: pending -> accepted -> executed
+                   -> failed
+                   -> timedOut
+```
+
+`clientRequestId` is the idempotency key. The command intent is immutable after submission. Terminal records retain failure details or the telemetry revision associated with execution when available. Desired state, backend lifecycle, and actual telemetry remain separate.
+
+## Contract sources
+
+- Runtime source of truth: `src/shared/domain-contracts.ts`, `api-contracts.ts`, and `realtime-contracts.ts`.
+- Backend-independent artifacts: generated JSON Schema in `contracts/`.
+- `npm run contracts:check` fails when committed generated schemas are stale.
+- ADR-0004 defines state separation; ADR-0005 defines realtime recovery.
+
+## Deferred implementation
+
+Stage 1 does not select a hot-store library, implement WebSocket transport, add TanStack Query/Zustand, or expose the new endpoints. Those dependencies and implementations belong to their approved vertical-slice stages; the contracts above are designed to keep those choices replaceable.

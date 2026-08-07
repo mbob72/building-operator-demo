@@ -1,11 +1,24 @@
-# Repository operating rules
+# Repository working agreement
 
-This MVP is developed sequentially by one coding agent.
+## Development mode
 
-- Do not start a new delivery stage without explicit user approval.
-- Keep domain and transport contracts in `src/shared` and `contracts`.
+- Work sequentially with one coding agent. Do not delegate to subagents unless the user explicitly changes this rule.
+- Do not start a later roadmap stage without explicit user approval.
+- Keep product decisions, assumptions, contracts, reports, and stage status in the repository.
+
+## Contract rules
+
+- Runtime Zod schemas in `src/shared` are the contract source of truth.
+- Generate backend-independent schemas with `npm run contracts:generate`.
+- Never hand-edit generated `contracts/*.schema.json` files other than the legacy Stage 0 `scene.schema.json`.
+- Keep scene geometry, stable device metadata, hot operational state, and UI-only state separate.
 - Keep scene rendering independent from React component structure.
 - Do not parse IFC in the browser; source preparation is an offline pipeline.
 - Record reversible assumptions in `docs/assumptions.md`.
-- Run `npm run verify` before presenting a stage for approval.
-- Stage 0 contains no devices and must not pre-empt decisions belonging to later stages.
+- Never place physical-system credentials in fixtures, bindings, logs, or frontend payloads.
+
+## Verification
+
+- Run `npm run verify` for contracts, unit tests, type checking, builds, and production smoke coverage.
+- Run `npm run test:e2e` for browser acceptance.
+- Record stage-specific results and known limitations before requesting stage approval.

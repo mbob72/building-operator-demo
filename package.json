@@ -13,6 +13,8 @@
     "build": "npm run typecheck && npm run build:server && npm run build:web",
     "build:server": "tsc -p tsconfig.server-build.json",
     "build:web": "vite build --config vite.config.ts",
+    "contracts:generate": "tsx scripts/contracts/generate-json-schema.ts",
+    "contracts:check": "tsx scripts/contracts/generate-json-schema.ts --check",
     "data:floor": ".venv/bin/python scripts/data-pipeline/extract_floor.py --ifc data/source/west-riverside-arc-ifc2x3.ifc --storey 'Level 1' --output data/generated/west-riverside-level-1.scene.json",
     "start": "node dist/server/server/index.js",
     "start:api": "tsx src/server/index.ts",
@@ -20,7 +22,7 @@
     "test": "vitest run",
     "test:e2e": "playwright test",
     "test:production": "scripts/smoke-production",
-    "verify": "npm run test && npm run build && npm run test:production"
+    "verify": "npm run contracts:check && npm run test && npm run build && npm run test:production"
   },
   "dependencies": {
     "@deck.gl/core": "^9.1.14",

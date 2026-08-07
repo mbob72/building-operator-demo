@@ -2,8 +2,9 @@
 
 ## Текущий статус
 
-- Текущий этап: **этап 0 завершён и принят**.
-- Следующий этап не начат.
+- Текущий этап: **этап 1 реализован и представлен для приёмки**.
+- Этап 0 завершён, принят и опубликован.
+- Этап 2 не начат.
 - Разработка ведётся последовательно одним coding agent.
 - Переход между этапами выполняется только после явного апрува пользователя.
 - Количество устройств не является строгой константой `20 000`: нужен репрезентативный набор порядка десятков тысяч, без ухода в игрушечный масштаб около 2 000 или избыточный масштаб около 200 000.
@@ -18,13 +19,15 @@
 
 Результат этапа подробно описан ниже.
 
-### Этап 1. Продуктовая модель и доменные контракты
+### Этап 1. Продуктовая модель и доменные контракты — ожидает приёмки
 
 - Уточнить операторские сценарии и границы MVP.
 - Зафиксировать сущности здания, этажа, устройства, телеметрии, аварии и команды.
 - Определить REST, realtime, snapshot и resync-контракты.
 - Разделить стабильные метаданные, горячую телеметрию и UI-состояние.
 - Дополнить JSON Schema и ADR.
+
+Результат этапа описан в `reports/stage-one.md`.
 
 ### Этап 2. Полный offline data pipeline
 
@@ -249,3 +252,38 @@ npm run dev:web -- --host 0.0.0.0
 - Deployment-решение зафиксировано в `docs/adr/0003-render-live-demo.md`.
 - Создан публичный репозиторий `mbob72/building-operator-demo` и Render service `building-operator-demo`.
 - Production deployment и публичные endpoints `/`, `/api/health` и `/api/scene/query` проверены.
+
+---
+
+## Отчёт о выполнении этапа 1
+
+### Результат
+
+- Зафиксированы операторские сценарии, границы MVP и safety-инварианты.
+- Определены building, floor, stable device metadata, hot telemetry, alarm и command contracts.
+- `draft` команды отделён от backend lifecycle `pending -> accepted -> executed | failed | timedOut`.
+- Определены REST-контракты каталога, authoritative snapshot, acknowledge, command create и command lookup.
+- Определены WebSocket subscribe/resume, contiguous event batches, heartbeat и `resync.required`.
+- Зафиксировано разделение plan scene, stable metadata, hot operational state, UI state и renderer state.
+- Runtime Zod-контракты являются source of truth; Draft 2020-12 JSON Schema генерируется автоматически.
+- Добавлены ADR-0004 и ADR-0005, contract tests и проверка freshness схем в `npm run verify`.
+
+### Проверки
+
+| Проверка | Результат |
+|---|---|
+| JSON Schema freshness | Пройдена |
+| TypeScript strict typecheck | Пройден |
+| Unit/API/contract tests | 13 из 13 пройдено |
+| Stage 1 contract tests | 7 из 7 пройдено |
+| Production build и smoke | Пройдены |
+| Chromium E2E | 1 из 1 пройден |
+
+### Ограничения
+
+- Operational `/api/v1` endpoints и WebSocket пока определены как контракты, но не реализованы.
+- Точное количество устройств остаётся решением этапа 2; отдельный fixture на 50 000 сохраняется для stress-теста.
+- Production authentication/authorization не входит в MVP, actor IDs остаются mock-значениями.
+- Этап 2 и последующие этапы не начаты.
+
+Подробный технический отчёт: `reports/stage-one.md`.

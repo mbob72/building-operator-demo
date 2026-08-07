@@ -1,6 +1,6 @@
 # Building operator MVP
 
-Stage 0 proves a viewport-aware scene delivery contract and a browser viewer for the real Level 1 architectural geometry of West Riverside Hospital. It intentionally contains no devices, telemetry, alarms, or commands.
+Stage 0 proves a viewport-aware scene delivery contract and a browser viewer for the real Level 1 architectural geometry of West Riverside Hospital. Stage 1 adds the product model and backend-independent contracts for future devices, telemetry, alarms, commands, and realtime recovery; those operational features are not implemented yet.
 
 ## Run
 
@@ -19,6 +19,15 @@ Open <http://127.0.0.1:5173>. The scene API listens on <http://127.0.0.1:3001>.
 npm run verify
 npm run test:e2e
 ```
+
+Runtime Zod contracts live in `src/shared`. Generate or check the backend-independent Draft 2020-12 schemas with:
+
+```bash
+npm run contracts:generate
+npm run contracts:check
+```
+
+See [`docs/product.md`](docs/product.md), [`docs/architecture.md`](docs/architecture.md), and [`reports/stage-one.md`](reports/stage-one.md) for the Stage 1 baseline.
 
 ## Production mode
 
