@@ -28,6 +28,11 @@ const device = {
   roomId: null,
   position: { x: 12.5, y: 18.25 },
   dataOrigin: 'synthetic',
+  provenance: {
+    kind: 'synthetic',
+    generator: 'operator-contract-test',
+    seed: 20260807,
+  },
   binding: {
     mode: 'simulated',
     protocol: 'dali',

@@ -3,6 +3,7 @@
 ## Development mode
 
 - Work sequentially with one coding agent. Do not delegate to subagents unless the user explicitly changes this rule.
+- Do not run Git commands or perform staging, commits, pushes, branch operations, or repository publication. Git is managed by the user.
 - Do not start a later roadmap stage without explicit user approval.
 - Keep product decisions, assumptions, contracts, reports, and stage status in the repository.
 

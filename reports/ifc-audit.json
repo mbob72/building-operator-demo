@@ -1,0 +1,1011 @@
+{
+  "project": "West Riverside Hospital",
+  "license": "CC BY 3.0",
+  "disciplines": [
+    {
+      "discipline": "Architecture",
+      "file": "west-riverside-arc-ifc2x3.ifc",
+      "schema": "IFC2X3",
+      "unitScaleToMeters": 0.001,
+      "productCount": 15316,
+      "storeys": [
+        {
+          "name": "Level 1",
+          "elevation": 165.8112,
+          "containedProducts": 844,
+          "deviceLikeProducts": 28
+        },
+        {
+          "name": "Level 2",
+          "elevation": 171.8112,
+          "containedProducts": 909,
+          "deviceLikeProducts": 50
+        },
+        {
+          "name": "Level 3",
+          "elevation": 176.8112,
+          "containedProducts": 1167,
+          "deviceLikeProducts": 108
+        },
+        {
+          "name": "Level 4",
+          "elevation": 181.8112,
+          "containedProducts": 856,
+          "deviceLikeProducts": 108
+        },
+        {
+          "name": "Level 5",
+          "elevation": 186.8112,
+          "containedProducts": 788,
+          "deviceLikeProducts": 84
+        },
+        {
+          "name": "Level 6",
+          "elevation": 191.8112,
+          "containedProducts": 448,
+          "deviceLikeProducts": 0
+        },
+        {
+          "name": "Level 7A",
+          "elevation": 196.8112,
+          "containedProducts": 154,
+          "deviceLikeProducts": 0
+        },
+        {
+          "name": "Level 7",
+          "elevation": 199.8112,
+          "containedProducts": 21,
+          "deviceLikeProducts": 0
+        }
+      ],
+      "deviceLike": {
+        "total": 378,
+        "positioned": 378,
+        "unpositioned": 0,
+        "byClass": {
+          "IfcFlowTerminal": 378
+        },
+        "byStorey": {
+          "Level 1": {
+            "IfcFlowTerminal": 28
+          },
+          "Level 2": {
+            "IfcFlowTerminal": 50
+          },
+          "Level 3": {
+            "IfcFlowTerminal": 108
+          },
+          "Level 4": {
+            "IfcFlowTerminal": 108
+          },
+          "Level 5": {
+            "IfcFlowTerminal": 84
+          }
+        },
+        "coordinateRanges": {
+          "x": [
+            -0.8762,
+            82.9963
+          ],
+          "y": [
+            55.9381,
+            121.2585
+          ],
+          "z": [
+            165.8604,
+            187.8029
+          ]
+        },
+        "samples": {
+          "IfcFlowTerminal": [
+            {
+              "ifcId": 208017,
+              "globalId": "3JlX9$$_PCKBNpDob64xFH",
+              "name": "Toilet-Wall-Mounted_:Toilet-Wall-Mounted:454944",
+              "objectType": "Toilet-Wall-Mounted",
+              "storey": "Level 4",
+              "position": [
+                51.5197,
+                58.0416,
+                181.9196
+              ],
+              "hasRepresentation": true
+            },
+            {
+              "ifcId": 260188,
+              "globalId": "3SAKKWjBX22vpF5zL8Wmso",
+              "name": "Shower-Head-w-Adjustable-Bar:Disabled_Shower_Head_with_adjustable_bar_2818:460218",
+              "objectType": "Disabled_Shower_Head_with_adjustable_bar_2818",
+              "storey": "Level 4",
+              "position": [
+                50.9675,
+                56.2882,
+                182.8029
+              ],
+              "hasRepresentation": true
+            },
+            {
+              "ifcId": 285718,
+              "globalId": "3SAKKWjBX22vpF5zL8WmLR",
+              "name": "Sink_Wall-Mounted:Sink_Wall-Mounted:462163",
+              "objectType": "Sink_Wall-Mounted",
+              "storey": "Level 4",
+              "position": [
+                49.4319,
+                56.3009,
+                182.4165
+              ],
+              "hasRepresentation": true
+            },
+            {
+              "ifcId": 325814,
+              "globalId": "1jI3nV6Sn2LfeyEYxROCsK",
+              "name": "Sink_Wall-Mounted:Sink_Wall-Mounted:467963",
+              "objectType": "Sink_Wall-Mounted",
+              "storey": "Level 4",
+              "position": [
+                51.7947,
+                60.442,
+                182.4165
+              ],
+              "hasRepresentation": true
+            },
+            {
+              "ifcId": 326238,
+              "globalId": "2yxDKnJ2X94u50UB7TJoHd",
+              "name": "Toilet-Wall-Mounted_:Toilet-Wall-Mounted:485511",
+              "objectType": "Toilet-Wall-Mounted",
+              "storey": "Level 4",
+              "position": [
+                61.7019,
+                57.9364,
+                181.9196
+              ],
+              "hasRepresentation": true
+            },
+            {
+              "ifcId": 326269,
+              "globalId": "2yxDKnJ2X94u50UB7TJoHW",
+              "name": "Shower-Head-w-Adjustable-Bar:Disabled_Shower_Head_with_adjustable_bar_2818:485514",
+              "objectType": "Disabled_Shower_Head_with_adjustable_bar_2818",
+              "storey": "Level 4",
+              "position": [
+                61.3834,
+                56.1259,
+                182.8029
+              ],
+              "hasRepresentation": true
+            },
+            {
+              "ifcId": 326293,
+              "globalId": "2yxDKnJ2X94u50UB7TJoHY",
+              "name": "Sink_Wall-Mounted:Sink_Wall-Mounted:485515",
+              "objectType": "Sink_Wall-Mounted",
+              "storey": "Level 4",
+              "position": [
+                59.8592,
+                55.9381,
+                182.4165
+              ],
+              "hasRepresentation": true
+            },
+            {
+              "ifcId": 326343,
+              "globalId": "2yxDKnJ2X94u50UB7TJoHu",
+              "name": "Sink_Wall-Mounted:Sink_Wall-Mounted:485521",
+              "objectType": "Sink_Wall-Mounted",
+              "storey": "Level 4",
+              "position": [
+                61.6612,
+                60.3522,
+                182.4165
+              ],
+              "hasRepresentation": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "discipline": "Electrical",
+      "file": "west-riverside-elec-ifc2x3.ifc",
+      "schema": "IFC2X3",
+      "unitScaleToMeters": 0.001,
+      "productCount": 6305,
+      "storeys": [
+        {
+          "name": "Level 1",
+          "elevation": 165.8378,
+          "containedProducts": 756,
+          "deviceLikeProducts": 318
+        },
+        {
+          "name": "Level 1 Ceiling",
+          "elevation": 168.2378,
+          "containedProducts": 79,
+          "deviceLikeProducts": 0
+        },
+        {
+          "name": "Level 2",
+          "elevation": 171.8378,
+          "containedProducts": 573,
+          "deviceLikeProducts": 361
+        },
+        {
+          "name": "Level 3",
+          "elevation": 176.8378,
+          "containedProducts": 633,
+          "deviceLikeProducts": 302
+        },
+        {
+          "name": "Level 4",
+          "elevation": 181.8378,
+          "containedProducts": 507,
+          "deviceLikeProducts": 180
+        },
+        {
+          "name": "Level 5",
+          "elevation": 186.8378,
+          "containedProducts": 249,
+          "deviceLikeProducts": 249
+        },
+        {
+          "name": "Level 6",
+          "elevation": 191.8378,
+          "containedProducts": 1,
+          "deviceLikeProducts": 0
+        }
+      ],
+      "deviceLike": {
+        "total": 1410,
+        "positioned": 1410,
+        "unpositioned": 0,
+        "byClass": {
+          "IfcFlowTerminal": 1410
+        },
+        "byStorey": {
+          "Level 1": {
+            "IfcFlowTerminal": 318
+          },
+          "Level 2": {
+            "IfcFlowTerminal": 361
+          },
+          "Level 3": {
+            "IfcFlowTerminal": 302
+          },
+          "Level 4": {
+            "IfcFlowTerminal": 180
+          },
+          "Level 5": {
+            "IfcFlowTerminal": 249
+          }
+        },
+        "coordinateRanges": {
+          "x": [
+            -9.7231,
+            86.4921
+          ],
+          "y": [
+            47.3209,
+            138.1261
+          ],
+          "z": [
+            166.2978,
+            189.5878
+          ]
+        },
+        "samples": {
+          "IfcFlowTerminal": [
+            {
+              "ifcId": 2603,
+              "globalId": "2CyAD8LljAg87hl5tUJTgw",
+              "name": "M_Plain Recessed Lighting Fixture:600x600 - 277:533933",
+              "objectType": "600x600 - 277",
+              "storey": "Level 3",
+              "position": [
+                78.7726,
+                93.3362,
+                179.5878
+              ],
+              "hasRepresentation": true
+            },
+            {
+              "ifcId": 2625,
+              "globalId": "2CyAD8LljAg87hl5tUJTgX",
+              "name": "M_Plain Recessed Lighting Fixture:600x600 - 277:533942",
+              "objectType": "600x600 - 277",
+              "storey": "Level 3",
+              "position": [
+                74.6364,
+                92.6068,
+                179.5878
+              ],
+              "hasRepresentation": true
+            },
+            {
+              "ifcId": 2645,
+              "globalId": "2CyAD8LljAg87hl5tUJThM",
+              "name": "M_Plain Recessed Lighting Fixture:600x600 - 277:533953",
+              "objectType": "600x600 - 277",
+              "storey": "Level 3",
+              "position": [
+                80.1732,
+                85.8385,
+                179.5878
+              ],
+              "hasRepresentation": true
+            },
+            {
+              "ifcId": 2665,
+              "globalId": "2CyAD8LljAg87hl5tUJThT",
+              "name": "M_Plain Recessed Lighting Fixture:600x600 - 277:533962",
+              "objectType": "600x600 - 277",
+              "storey": "Level 3",
+              "position": [
+                79.3397,
+                90.5656,
+                179.5878
+              ],
+              "hasRepresentation": true
+            },
+            {
+              "ifcId": 2685,
+              "globalId": "2CyAD8LljAg87hl5tUJThF",
+              "name": "M_Plain Recessed Lighting Fixture:600x600 - 277:533976",
+              "objectType": "600x600 - 277",
+              "storey": "Level 3",
+              "position": [
+                74.675,
+                84.869,
+                179.5878
+              ],
+              "hasRepresentation": true
+            },
+            {
+              "ifcId": 2705,
+              "globalId": "2CyAD8LljAg87hl5tUJThs",
+              "name": "M_Plain Recessed Lighting Fixture:600x600 - 277:533985",
+              "objectType": "600x600 - 277",
+              "storey": "Level 3",
+              "position": [
+                73.9457,
+                89.0052,
+                179.5878
+              ],
+              "hasRepresentation": true
+            },
+            {
+              "ifcId": 2725,
+              "globalId": "2CyAD8LljAg87hl5tUJThl",
+              "name": "M_Plain Recessed Lighting Fixture:600x600 - 277:534008",
+              "objectType": "600x600 - 277",
+              "storey": "Level 3",
+              "position": [
+                71.1551,
+                88.739,
+                179.5878
+              ],
+              "hasRepresentation": true
+            },
+            {
+              "ifcId": 2745,
+              "globalId": "2CyAD8LljAg87hl5tUJTaM",
+              "name": "M_Plain Recessed Lighting Fixture:600x600 - 277:534017",
+              "objectType": "600x600 - 277",
+              "storey": "Level 3",
+              "position": [
+                71.3383,
+                84.543,
+                179.5878
+              ],
+              "hasRepresentation": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "discipline": "Fire Alarm",
+      "file": "west-riverside-fire-ifc2x3.ifc",
+      "schema": "IFC2X3",
+      "unitScaleToMeters": 0.001,
+      "productCount": 874,
+      "storeys": [
+        {
+          "name": "Level 1",
+          "elevation": 165.8378,
+          "containedProducts": 253,
+          "deviceLikeProducts": 251
+        },
+        {
+          "name": "Level 2",
+          "elevation": 171.8378,
+          "containedProducts": 190,
+          "deviceLikeProducts": 189
+        },
+        {
+          "name": "Level 3",
+          "elevation": 176.8378,
+          "containedProducts": 347,
+          "deviceLikeProducts": 346
+        },
+        {
+          "name": "Level 4",
+          "elevation": 181.8378,
+          "containedProducts": 46,
+          "deviceLikeProducts": 45
+        },
+        {
+          "name": "Level 5",
+          "elevation": 186.8378,
+          "containedProducts": 31,
+          "deviceLikeProducts": 30
+        }
+      ],
+      "deviceLike": {
+        "total": 861,
+        "positioned": 861,
+        "unpositioned": 0,
+        "byClass": {
+          "IfcDistributionControlElement": 861
+        },
+        "byStorey": {
+          "Level 1": {
+            "IfcDistributionControlElement": 251
+          },
+          "Level 2": {
+            "IfcDistributionControlElement": 189
+          },
+          "Level 3": {
+            "IfcDistributionControlElement": 346
+          },
+          "Level 4": {
+            "IfcDistributionControlElement": 45
+          },
+          "Level 5": {
+            "IfcDistributionControlElement": 30
+          }
+        },
+        "coordinateRanges": {
+          "x": [
+            -9.7068,
+            86.6849
+          ],
+          "y": [
+            50.1667,
+            137.3918
+          ],
+          "z": [
+            167.0378,
+            189.5878
+          ]
+        },
+        "samples": {
+          "IfcDistributionControlElement": [
+            {
+              "ifcId": 5111,
+              "globalId": "2NvWEO1Wb9Jwl21EQJp5kM",
+              "name": "Fire Alarm Horn Strobe - Ceiling Mounted:Standard:646382",
+              "objectType": "Standard",
+              "storey": "Level 1",
+              "position": [
+                -8.2077,
+                66.0197,
+                168.5878
+              ],
+              "hasRepresentation": true
+            },
+            {
+              "ifcId": 5130,
+              "globalId": "2NvWEO1Wb9Jwl21EQJp5k0",
+              "name": "Fire Alarm Horn Strobe - Ceiling Mounted:Standard:646392",
+              "objectType": "Standard",
+              "storey": "Level 1",
+              "position": [
+                -8.4139,
+                69.6546,
+                168.5878
+              ],
+              "hasRepresentation": true
+            },
+            {
+              "ifcId": 5142,
+              "globalId": "2NvWEO1Wb9Jwl21EQJp5fw",
+              "name": "Fire Alarm Horn Strobe - Ceiling Mounted:Standard:646402",
+              "objectType": "Standard",
+              "storey": "Level 1",
+              "position": [
+                -7.04,
+                73.356,
+                168.5878
+              ],
+              "hasRepresentation": true
+            },
+            {
+              "ifcId": 5154,
+              "globalId": "2NvWEO1Wb9Jwl21EQJp5fq",
+              "name": "Fire Alarm Horn Strobe - Ceiling Mounted:Standard:646412",
+              "objectType": "Standard",
+              "storey": "Level 1",
+              "position": [
+                -4.754,
+                79.6114,
+                168.5878
+              ],
+              "hasRepresentation": true
+            },
+            {
+              "ifcId": 5166,
+              "globalId": "2NvWEO1Wb9Jwl21EQJp5fd",
+              "name": "Fire Alarm Horn Strobe - Ceiling Mounted:Standard:646431",
+              "objectType": "Standard",
+              "storey": "Level 1",
+              "position": [
+                -3.63,
+                82.8182,
+                168.5878
+              ],
+              "hasRepresentation": true
+            },
+            {
+              "ifcId": 5178,
+              "globalId": "2NvWEO1Wb9Jwl21EQJp5fK",
+              "name": "Fire Alarm Horn Strobe - Ceiling Mounted:Standard:646444",
+              "objectType": "Standard",
+              "storey": "Level 1",
+              "position": [
+                -1.9332,
+                87.4554,
+                168.5878
+              ],
+              "hasRepresentation": true
+            },
+            {
+              "ifcId": 5190,
+              "globalId": "2NvWEO1Wb9Jwl21EQJp5fB",
+              "name": "Fire Alarm Horn Strobe - Ceiling Mounted:Standard:646451",
+              "objectType": "Standard",
+              "storey": "Level 1",
+              "position": [
+                -0.7072,
+                90.8427,
+                168.5878
+              ],
+              "hasRepresentation": true
+            },
+            {
+              "ifcId": 5202,
+              "globalId": "2NvWEO1Wb9Jwl21EQJp5f5",
+              "name": "Fire Alarm Horn Strobe - Ceiling Mounted:Standard:646461",
+              "objectType": "Standard",
+              "storey": "Level 1",
+              "position": [
+                3.5169,
+                89.1476,
+                168.3378
+              ],
+              "hasRepresentation": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "discipline": "Mechanical",
+      "file": "west-riverside-mech-ifc2x3.ifc",
+      "schema": "IFC2X3",
+      "unitScaleToMeters": 0.001,
+      "productCount": 59215,
+      "storeys": [
+        {
+          "name": "Level 1",
+          "elevation": 165.8378,
+          "containedProducts": 2684,
+          "deviceLikeProducts": 288
+        },
+        {
+          "name": "Level 2",
+          "elevation": 171.8378,
+          "containedProducts": 1294,
+          "deviceLikeProducts": 37
+        },
+        {
+          "name": "Level 2 Ceiling",
+          "elevation": 174.5878,
+          "containedProducts": 1351,
+          "deviceLikeProducts": 228
+        },
+        {
+          "name": "Level 3",
+          "elevation": 176.8378,
+          "containedProducts": 2660,
+          "deviceLikeProducts": 108
+        },
+        {
+          "name": "Level 3 Ceiling",
+          "elevation": 179.5878,
+          "containedProducts": 1874,
+          "deviceLikeProducts": 73
+        },
+        {
+          "name": "Level 4",
+          "elevation": 181.8378,
+          "containedProducts": 4600,
+          "deviceLikeProducts": 186
+        },
+        {
+          "name": "Level 5",
+          "elevation": 186.8378,
+          "containedProducts": 2093,
+          "deviceLikeProducts": 85
+        },
+        {
+          "name": "Level 5 Ceiling",
+          "elevation": 189.5878,
+          "containedProducts": 1539,
+          "deviceLikeProducts": 59
+        },
+        {
+          "name": "Level 6",
+          "elevation": 191.8378,
+          "containedProducts": 1036,
+          "deviceLikeProducts": 0
+        },
+        {
+          "name": "Level 6 Ceiling",
+          "elevation": 194.5878,
+          "containedProducts": 447,
+          "deviceLikeProducts": 0
+        },
+        {
+          "name": "Level 7",
+          "elevation": 196.8378,
+          "containedProducts": 92,
+          "deviceLikeProducts": 0
+        }
+      ],
+      "deviceLike": {
+        "total": 1064,
+        "positioned": 1064,
+        "unpositioned": 0,
+        "byClass": {
+          "IfcFlowTerminal": 1064
+        },
+        "byStorey": {
+          "Level 1": {
+            "IfcFlowTerminal": 288
+          },
+          "Level 2": {
+            "IfcFlowTerminal": 37
+          },
+          "Level 2 Ceiling": {
+            "IfcFlowTerminal": 228
+          },
+          "Level 3": {
+            "IfcFlowTerminal": 108
+          },
+          "Level 3 Ceiling": {
+            "IfcFlowTerminal": 73
+          },
+          "Level 4": {
+            "IfcFlowTerminal": 186
+          },
+          "Level 5": {
+            "IfcFlowTerminal": 85
+          },
+          "Level 5 Ceiling": {
+            "IfcFlowTerminal": 59
+          }
+        },
+        "coordinateRanges": {
+          "x": [
+            -10.1076,
+            85.069
+          ],
+          "y": [
+            53.5144,
+            138.2188
+          ],
+          "z": [
+            168.3378,
+            189.5878
+          ]
+        },
+        "samples": {
+          "IfcFlowTerminal": [
+            {
+              "ifcId": 4778,
+              "globalId": "38mgLsUHP0CBIlmkuIlPo4",
+              "name": "M_Supply Diffuser_HEPA - Rectangular Face Round Neck - Hosted:305 mmx305 mm Face 250 mm Neck - Hosted 2:758866",
+              "objectType": "305 mmx305 mm Face 250 mm Neck - Hosted 2",
+              "storey": "Level 4",
+              "position": [
+                48.734,
+                83.6428,
+                184.5878
+              ],
+              "hasRepresentation": true
+            },
+            {
+              "ifcId": 4797,
+              "globalId": "38mgLsUHP0CBIlmkuIlPo5",
+              "name": "M_Supply Diffuser_HEPA - Rectangular Face Round Neck - Hosted:305 mmx305 mm Face 250 mm Neck - Hosted 2:758867",
+              "objectType": "305 mmx305 mm Face 250 mm Neck - Hosted 2",
+              "storey": "Level 4",
+              "position": [
+                50.5271,
+                83.4859,
+                184.5878
+              ],
+              "hasRepresentation": true
+            },
+            {
+              "ifcId": 7810,
+              "globalId": "38mgLsUHP0CBIlmkuIlPmw",
+              "name": "M_Supply Diffuser_HEPA - Rectangular Face Round Neck - Hosted:305 mmx305 mm Face 250 mm Neck - Hosted 2:759020",
+              "objectType": "305 mmx305 mm Face 250 mm Neck - Hosted 2",
+              "storey": "Level 4",
+              "position": [
+                53.1526,
+                83.8585,
+                184.5878
+              ],
+              "hasRepresentation": true
+            },
+            {
+              "ifcId": 7828,
+              "globalId": "38mgLsUHP0CBIlmkuIlPmx",
+              "name": "M_Supply Diffuser_HEPA - Rectangular Face Round Neck - Hosted:305 mmx305 mm Face 250 mm Neck - Hosted 2:759021",
+              "objectType": "305 mmx305 mm Face 250 mm Neck - Hosted 2",
+              "storey": "Level 4",
+              "position": [
+                54.9458,
+                83.7016,
+                184.5878
+              ],
+              "hasRepresentation": true
+            },
+            {
+              "ifcId": 8142,
+              "globalId": "38mgLsUHP0CBIlmkuIlPtt",
+              "name": "M_Supply Diffuser_HEPA - Rectangular Face Round Neck - Hosted:305 mmx305 mm Face 250 mm Neck - Hosted 2:759073",
+              "objectType": "305 mmx305 mm Face 250 mm Neck - Hosted 2",
+              "storey": "Level 4",
+              "position": [
+                57.6773,
+                83.6463,
+                184.5878
+              ],
+              "hasRepresentation": true
+            },
+            {
+              "ifcId": 8162,
+              "globalId": "38mgLsUHP0CBIlmkuIlPtq",
+              "name": "M_Supply Diffuser_HEPA - Rectangular Face Round Neck - Hosted:305 mmx305 mm Face 250 mm Neck - Hosted 2:759074",
+              "objectType": "305 mmx305 mm Face 250 mm Neck - Hosted 2",
+              "storey": "Level 4",
+              "position": [
+                59.4756,
+                83.7248,
+                184.5878
+              ],
+              "hasRepresentation": true
+            },
+            {
+              "ifcId": 8488,
+              "globalId": "38mgLsUHP0CBIlmkuIlPs1",
+              "name": "M_Supply Diffuser_HEPA - Rectangular Face Round Neck - Hosted:305 mmx305 mm Face 250 mm Neck - Hosted 2:759127",
+              "objectType": "305 mmx305 mm Face 250 mm Neck - Hosted 2",
+              "storey": "Level 4",
+              "position": [
+                62.0562,
+                83.8375,
+                184.5878
+              ],
+              "hasRepresentation": true
+            },
+            {
+              "ifcId": 8508,
+              "globalId": "38mgLsUHP0CBIlmkuIlPsE",
+              "name": "M_Supply Diffuser_HEPA - Rectangular Face Round Neck - Hosted:305 mmx305 mm Face 250 mm Neck - Hosted 2:759128",
+              "objectType": "305 mmx305 mm Face 250 mm Neck - Hosted 2",
+              "storey": "Level 4",
+              "position": [
+                63.8544,
+                83.916,
+                184.5878
+              ],
+              "hasRepresentation": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "discipline": "Sprinklers",
+      "file": "west-riverside-sprinkle-ifc2x3.ifc",
+      "schema": "IFC2X3",
+      "unitScaleToMeters": 0.3048,
+      "productCount": 38255,
+      "storeys": [
+        {
+          "name": "Level 1",
+          "elevation": 165.8112,
+          "containedProducts": 2621,
+          "deviceLikeProducts": 252
+        },
+        {
+          "name": "Level 2",
+          "elevation": 171.9072,
+          "containedProducts": 2097,
+          "deviceLikeProducts": 229
+        },
+        {
+          "name": "Level 3",
+          "elevation": 176.784,
+          "containedProducts": 3033,
+          "deviceLikeProducts": 314
+        },
+        {
+          "name": "Level 4",
+          "elevation": 181.6608,
+          "containedProducts": 2937,
+          "deviceLikeProducts": 274
+        },
+        {
+          "name": "Level 5",
+          "elevation": 186.5376,
+          "containedProducts": 2802,
+          "deviceLikeProducts": 285
+        }
+      ],
+      "deviceLike": {
+        "total": 1354,
+        "positioned": 1354,
+        "unpositioned": 0,
+        "byClass": {
+          "IfcFlowTerminal": 1354
+        },
+        "byStorey": {
+          "Level 1": {
+            "IfcFlowTerminal": 252
+          },
+          "Level 2": {
+            "IfcFlowTerminal": 229
+          },
+          "Level 3": {
+            "IfcFlowTerminal": 314
+          },
+          "Level 4": {
+            "IfcFlowTerminal": 274
+          },
+          "Level 5": {
+            "IfcFlowTerminal": 285
+          }
+        },
+        "coordinateRanges": {
+          "x": [
+            -8.8155,
+            86.7364
+          ],
+          "y": [
+            48.6368,
+            138.1225
+          ],
+          "z": [
+            168.3112,
+            189.5612
+          ]
+        },
+        "samples": {
+          "IfcFlowTerminal": [
+            {
+              "ifcId": 463,
+              "globalId": "0HuLVU0hf5gxwY8y9yDwpi",
+              "name": "Sprinkler - Pendent - Hosted:1/2\" Pendent:723585",
+              "objectType": "1/2\" Pendent",
+              "storey": "Level 5",
+              "position": [
+                86.6766,
+                58.8934,
+                189.5612
+              ],
+              "hasRepresentation": true
+            },
+            {
+              "ifcId": 492,
+              "globalId": "0HuLVU0hf5gxwY8y9yDwpk",
+              "name": "Sprinkler - Pendent - Hosted:1/2\" Pendent:723587",
+              "objectType": "1/2\" Pendent",
+              "storey": "Level 5",
+              "position": [
+                85.7745,
+                61.7546,
+                189.5612
+              ],
+              "hasRepresentation": true
+            },
+            {
+              "ifcId": 510,
+              "globalId": "0HuLVU0hf5gxwY8y9yDwpf",
+              "name": "Sprinkler - Pendent - Hosted:1/2\" Pendent:723588",
+              "objectType": "1/2\" Pendent",
+              "storey": "Level 5",
+              "position": [
+                84.8723,
+                64.6157,
+                189.5612
+              ],
+              "hasRepresentation": true
+            },
+            {
+              "ifcId": 528,
+              "globalId": "0HuLVU0hf5gxwY8y9yDwph",
+              "name": "Sprinkler - Pendent - Hosted:1/2\" Pendent:723590",
+              "objectType": "1/2\" Pendent",
+              "storey": "Level 5",
+              "position": [
+                81.2895,
+                66.0025,
+                189.5612
+              ],
+              "hasRepresentation": true
+            },
+            {
+              "ifcId": 546,
+              "globalId": "0HuLVU0hf5gxwY8y9yDwpg",
+              "name": "Sprinkler - Pendent - Hosted:1/2\" Pendent:723591",
+              "objectType": "1/2\" Pendent",
+              "storey": "Level 5",
+              "position": [
+                78.4283,
+                65.1004,
+                189.5612
+              ],
+              "hasRepresentation": true
+            },
+            {
+              "ifcId": 564,
+              "globalId": "0HuLVU0hf5gxwY8y9yDwpb",
+              "name": "Sprinkler - Pendent - Hosted:1/2\" Pendent:723592",
+              "objectType": "1/2\" Pendent",
+              "storey": "Level 5",
+              "position": [
+                82.7961,
+                58.4873,
+                189.5612
+              ],
+              "hasRepresentation": true
+            },
+            {
+              "ifcId": 582,
+              "globalId": "0HuLVU0hf5gxwY8y9yDwpd",
+              "name": "Sprinkler - Pendent - Hosted:1/2\" Pendent:723594",
+              "objectType": "1/2\" Pendent",
+              "storey": "Level 5",
+              "position": [
+                81.7445,
+                63.8178,
+                189.5612
+              ],
+              "hasRepresentation": true
+            },
+            {
+              "ifcId": 600,
+              "globalId": "0HuLVU0hf5gxwY8y9yDwpc",
+              "name": "Sprinkler - Pendent - Hosted:1/2\" Pendent:723595",
+              "objectType": "1/2\" Pendent",
+              "storey": "Level 5",
+              "position": [
+                82.6466,
+                60.9566,
+                189.5612
+              ],
+              "hasRepresentation": true
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

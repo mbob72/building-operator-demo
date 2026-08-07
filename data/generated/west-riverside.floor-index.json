@@ -1,0 +1,255 @@
+{
+  "datasetVersion": "west-riverside-stage-2-v1",
+  "generatedAt": "2026-08-07T00:00:00.000Z",
+  "building": {
+    "id": "west-riverside",
+    "name": "West Riverside Hospital",
+    "timezone": "Etc/UTC"
+  },
+  "source": {
+    "file": "west-riverside-arc-ifc2x3.ifc",
+    "sha256": "989ace1d52f694ee94d80bd99aa81d0ff3d76cf21f34fcfd00a286ac897ed8a6",
+    "license": "CC BY 3.0"
+  },
+  "floors": [
+    {
+      "id": "west-riverside-level-1",
+      "name": "West Riverside Hospital \u00b7 Level 1",
+      "storey": "Level 1",
+      "elevation": 165.8112,
+      "bounds": [
+        0.0,
+        0.0,
+        103.7877,
+        97.1645
+      ],
+      "worldOrigin": [
+        -14.2404,
+        45.1456
+      ],
+      "featureCount": 1062,
+      "byKind": {
+        "wall": 473,
+        "column": 147,
+        "window": 303,
+        "door": 139
+      },
+      "byZoomBand": {
+        "overview": 620,
+        "standard": 620,
+        "detail": 1062
+      },
+      "extractionMode": "horizontal-section",
+      "order": 1,
+      "sceneFile": "west-riverside-level-1.scene.json"
+    },
+    {
+      "id": "west-riverside-level-2",
+      "name": "West Riverside Hospital \u00b7 Level 2",
+      "storey": "Level 2",
+      "elevation": 171.8112,
+      "bounds": [
+        0.0,
+        0.0,
+        103.7877,
+        90.6175
+      ],
+      "worldOrigin": [
+        -14.2403,
+        51.6733
+      ],
+      "featureCount": 860,
+      "byKind": {
+        "column": 147,
+        "wall": 316,
+        "window": 332,
+        "door": 65
+      },
+      "byZoomBand": {
+        "overview": 463,
+        "standard": 463,
+        "detail": 860
+      },
+      "extractionMode": "horizontal-section",
+      "order": 2,
+      "sceneFile": "west-riverside-level-2.scene.json"
+    },
+    {
+      "id": "west-riverside-level-3",
+      "name": "West Riverside Hospital \u00b7 Level 3",
+      "storey": "Level 3",
+      "elevation": 176.8112,
+      "bounds": [
+        0.0,
+        0.0,
+        96.7363,
+        82.8584
+      ],
+      "worldOrigin": [
+        -7.5344,
+        50.0533
+      ],
+      "featureCount": 549,
+      "byKind": {
+        "wall": 368,
+        "door": 112,
+        "column": 69
+      },
+      "byZoomBand": {
+        "overview": 437,
+        "standard": 437,
+        "detail": 549
+      },
+      "extractionMode": "horizontal-section",
+      "order": 3,
+      "sceneFile": "west-riverside-level-3.scene.json"
+    },
+    {
+      "id": "west-riverside-level-4",
+      "name": "West Riverside Hospital \u00b7 Level 4",
+      "storey": "Level 4",
+      "elevation": 181.8112,
+      "bounds": [
+        0.0,
+        0.0,
+        95.9724,
+        81.6285
+      ],
+      "worldOrigin": [
+        -7.0157,
+        49.7889
+      ],
+      "featureCount": 530,
+      "byKind": {
+        "wall": 369,
+        "door": 104,
+        "column": 57
+      },
+      "byZoomBand": {
+        "overview": 426,
+        "standard": 426,
+        "detail": 530
+      },
+      "extractionMode": "horizontal-section",
+      "order": 4,
+      "sceneFile": "west-riverside-level-4.scene.json"
+    },
+    {
+      "id": "west-riverside-level-5",
+      "name": "West Riverside Hospital \u00b7 Level 5",
+      "storey": "Level 5",
+      "elevation": 186.8112,
+      "bounds": [
+        0.0,
+        0.0,
+        86.0896,
+        81.6285
+      ],
+      "worldOrigin": [
+        2.8526,
+        49.7889
+      ],
+      "featureCount": 435,
+      "byKind": {
+        "wall": 300,
+        "door": 85,
+        "column": 50
+      },
+      "byZoomBand": {
+        "overview": 350,
+        "standard": 350,
+        "detail": 435
+      },
+      "extractionMode": "horizontal-section",
+      "order": 5,
+      "sceneFile": "west-riverside-level-5.scene.json"
+    },
+    {
+      "id": "west-riverside-level-6",
+      "name": "West Riverside Hospital \u00b7 Level 6",
+      "storey": "Level 6",
+      "elevation": 191.8112,
+      "bounds": [
+        0.0,
+        0.0,
+        51.2267,
+        91.0795
+      ],
+      "worldOrigin": [
+        25.9363,
+        43.4081
+      ],
+      "featureCount": 79,
+      "byKind": {
+        "wall": 68,
+        "column": 3,
+        "door": 8
+      },
+      "byZoomBand": {
+        "overview": 71,
+        "standard": 71,
+        "detail": 79
+      },
+      "extractionMode": "horizontal-section",
+      "order": 6,
+      "sceneFile": "west-riverside-level-6.scene.json"
+    },
+    {
+      "id": "west-riverside-level-7a",
+      "name": "West Riverside Hospital \u00b7 Level 7A",
+      "storey": "Level 7A",
+      "elevation": 196.8112,
+      "bounds": [
+        0.0,
+        0.0,
+        56.9196,
+        85.739
+      ],
+      "worldOrigin": [
+        26.381,
+        45.9434
+      ],
+      "featureCount": 154,
+      "byKind": {
+        "zone": 154
+      },
+      "byZoomBand": {
+        "overview": 154,
+        "standard": 154,
+        "detail": 154
+      },
+      "extractionMode": "horizontal-projection",
+      "order": 7,
+      "sceneFile": "west-riverside-level-7a.scene.json"
+    },
+    {
+      "id": "west-riverside-level-7",
+      "name": "West Riverside Hospital \u00b7 Level 7",
+      "storey": "Level 7",
+      "elevation": 199.8112,
+      "bounds": [
+        0.0,
+        0.0,
+        12.5731,
+        13.668
+      ],
+      "worldOrigin": [
+        38.3845,
+        119.578
+      ],
+      "featureCount": 11,
+      "byKind": {
+        "wall": 10,
+        "door": 1
+      },
+      "byZoomBand": {
+        "overview": 10,
+        "standard": 10,
+        "detail": 11
+      },
+      "extractionMode": "horizontal-section",
+      "order": 8,
+      "sceneFile": "west-riverside-level-7.scene.json"
+    }
+  ]
+}

@@ -25,11 +25,16 @@ export const DeviceTypeSchema = z.enum([
   'actuator',
   'smoke-detector',
   'heat-detector',
+  'fire-alarm-sounder',
+  'manual-pull-station',
+  'sprinkler',
   'security-sensor',
+  'hvac-terminal',
   'hvac-unit',
   'meter',
   'electrical-controller',
   'access-controller',
+  'solar-panel',
   'other',
 ]);
 
@@ -68,6 +73,26 @@ export const DeviceBindingSchema = z.object({
   reference: z.string().min(1).max(256),
   dataOrigin: DataOriginSchema,
 }).strict();
+
+export const DeviceProvenanceSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('ifc'),
+    sourceFile: z.string().min(1).max(256),
+    ifcGlobalId: z.string().min(1).max(128),
+    ifcType: z.string().min(1).max(128),
+    ifcId: z.number().int().positive(),
+  }).strict(),
+  z.object({
+    kind: z.literal('derived'),
+    rule: z.string().min(1).max(256),
+    sourceRefs: z.array(z.string().min(1).max(256)).min(1),
+  }).strict(),
+  z.object({
+    kind: z.literal('synthetic'),
+    generator: z.string().min(1).max(256),
+    seed: z.number().int().nonnegative(),
+  }).strict(),
+]);
 
 export const TelemetryValueTypeSchema = z.enum(['boolean', 'number', 'string']);
 export const TelemetryChannelDefinitionSchema = z.object({
@@ -114,10 +139,16 @@ export const DeviceMetadataSchema = z.object({
   roomId: EntityIdSchema.nullable(),
   position: PositionSchema,
   dataOrigin: DataOriginSchema,
+  provenance: DeviceProvenanceSchema,
   binding: DeviceBindingSchema,
   capabilities: DeviceCapabilitiesSchema,
-}).strict().refine((device) => device.protocol === device.binding.protocol, {
-  message: 'device protocol must match binding protocol',
+}).strict().superRefine((device, context) => {
+  if (device.protocol !== device.binding.protocol) {
+    context.addIssue({ code: 'custom', message: 'device protocol must match binding protocol' });
+  }
+  if (device.dataOrigin !== device.provenance.kind) {
+    context.addIssue({ code: 'custom', message: 'dataOrigin must match provenance kind' });
+  }
 });
 
 export const DeviceCatalogSchema = z.object({

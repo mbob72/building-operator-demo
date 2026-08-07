@@ -62,6 +62,7 @@ export const SceneSourceSchema = z.object({
   license: z.string(),
   storey: z.string(),
   sectionHeightMeters: z.number(),
+  extractionMode: z.enum(['horizontal-section', 'horizontal-projection']).optional(),
 });
 
 export const PreparedSceneSchema = z.object({
@@ -71,6 +72,11 @@ export const PreparedSceneSchema = z.object({
   stats: z.object({
     featureCount: z.number().int().nonnegative(),
     byKind: z.record(z.string(), z.number().int().nonnegative()),
+    byZoomBand: z.object({
+      overview: z.number().int().nonnegative(),
+      standard: z.number().int().nonnegative(),
+      detail: z.number().int().nonnegative(),
+    }).optional(),
   }),
 });
 

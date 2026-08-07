@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import re
 from pathlib import Path
 from typing import Any
 
@@ -14,7 +15,7 @@ import ifcopenshell.geom
 import ifcopenshell.util.placement
 import ifcopenshell.util.unit
 import numpy as np
-from shapely.geometry import LineString
+from shapely.geometry import LineString, MultiPoint, Polygon
 from shapely.ops import polygonize, unary_union
 
 
@@ -88,6 +89,23 @@ def element_polygons(
     ]
 
 
+def element_footprint(
+    settings: ifcopenshell.geom.settings,
+    element: Any,
+) -> Polygon | None:
+    try:
+        shape = ifcopenshell.geom.create_shape(settings, element)
+        vertices = np.asarray(shape.geometry.verts, dtype=float).reshape((-1, 3))
+    except Exception:
+        return None
+    if not len(vertices):
+        return None
+    footprint = MultiPoint(vertices[:, :2]).convex_hull
+    if not isinstance(footprint, Polygon) or footprint.area < 0.002:
+        return None
+    return footprint.simplify(0.01, preserve_topology=True)
+
+
 def contained_elements(storey: Any) -> list[Any]:
     return [
         element
@@ -100,7 +118,15 @@ def rounded(value: float) -> float:
     return round(value, 4)
 
 
-def extract(ifc_path: Path, storey_name: str) -> dict[str, Any]:
+def floor_id(storey_name: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "-", storey_name.lower()).strip("-")
+    return f"west-riverside-{slug}"
+
+
+def extract_with_metadata(
+    ifc_path: Path,
+    storey_name: str,
+) -> tuple[dict[str, Any], dict[str, Any]]:
     model = ifcopenshell.open(ifc_path)
     storey = next(
         (candidate for candidate in model.by_type("IfcBuildingStorey") if candidate.Name == storey_name),
@@ -118,6 +144,7 @@ def extract(ifc_path: Path, storey_name: str) -> dict[str, Any]:
     settings = ifcopenshell.geom.settings()
     settings.set(settings.USE_WORLD_COORDS, True)
     extracted: list[dict[str, Any]] = []
+    extraction_mode = "horizontal-section"
 
     for element in contained_elements(storey):
         category = CATEGORIES.get(element.is_a())
@@ -141,7 +168,26 @@ def extract(ifc_path: Path, storey_name: str) -> dict[str, Any]:
             })
 
     if not extracted:
-        raise RuntimeError("Horizontal section produced no polygons")
+        extraction_mode = "horizontal-projection"
+        for element in contained_elements(storey):
+            footprint = element_footprint(settings, element)
+            if footprint is None:
+                continue
+            coordinates = list(footprint.exterior.coords)[:-1]
+            extracted.append({
+                "id": f"ifc-{element.id()}-footprint",
+                "kind": "zone",
+                "geometryType": "polygon",
+                "coordinates": coordinates,
+                "minZoom": -8.0,
+                "maxZoom": 24.0,
+                "ifcId": element.id(),
+                "ifcType": element.is_a(),
+                "name": element.Name,
+            })
+
+    if not extracted:
+        raise RuntimeError("Floor produced neither a horizontal section nor projected footprints")
 
     min_x = min(point[0] for feature in extracted for point in feature["coordinates"])
     min_y = min(point[1] for feature in extracted for point in feature["coordinates"])
@@ -165,7 +211,8 @@ def extract(ifc_path: Path, storey_name: str) -> dict[str, Any]:
     for feature in extracted:
         counts[feature["kind"]] = counts.get(feature["kind"], 0) + 1
 
-    return {
+    identifier = floor_id(storey_name)
+    scene = {
         "source": {
             "project": "West Riverside Hospital",
             "discipline": "Architecture",
@@ -174,16 +221,52 @@ def extract(ifc_path: Path, storey_name: str) -> dict[str, Any]:
             "license": "CC BY 3.0",
             "storey": storey_name,
             "sectionHeightMeters": 1.2,
+            "extractionMode": extraction_mode,
         },
         "floor": {
-            "id": "west-riverside-level-1",
+            "id": identifier,
             "name": f"West Riverside Hospital · {storey_name}",
             "elevation": rounded(storey_z),
             "bounds": [0.0, 0.0, rounded(width), rounded(height)],
         },
         "features": extracted,
-        "stats": {"featureCount": len(extracted), "byKind": counts},
+        "stats": {
+            "featureCount": len(extracted),
+            "byKind": counts,
+            "byZoomBand": {
+                "overview": sum(
+                    feature["minZoom"] <= 1.0 <= feature["maxZoom"]
+                    for feature in extracted
+                ),
+                "standard": sum(
+                    feature["minZoom"] <= 3.0 <= feature["maxZoom"]
+                    for feature in extracted
+                ),
+                "detail": sum(
+                    feature["minZoom"] <= 5.0 <= feature["maxZoom"]
+                    for feature in extracted
+                ),
+            },
+        },
     }
+    metadata = {
+        "id": identifier,
+        "name": scene["floor"]["name"],
+        "storey": storey_name,
+        "elevation": rounded(storey_z),
+        "bounds": scene["floor"]["bounds"],
+        "worldOrigin": [rounded(min_x - margin), rounded(min_y - margin)],
+        "featureCount": len(extracted),
+        "byKind": counts,
+        "byZoomBand": scene["stats"]["byZoomBand"],
+        "extractionMode": extraction_mode,
+    }
+    return scene, metadata
+
+
+def extract(ifc_path: Path, storey_name: str) -> dict[str, Any]:
+    scene, _ = extract_with_metadata(ifc_path, storey_name)
+    return scene
 
 
 def main() -> None:
@@ -191,11 +274,15 @@ def main() -> None:
     parser.add_argument("--ifc", type=Path, required=True)
     parser.add_argument("--storey", default="Level 1")
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--metadata-output", type=Path)
     args = parser.parse_args()
 
-    result = extract(args.ifc, args.storey)
+    result, metadata = extract_with_metadata(args.ifc, args.storey)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(result, separators=(",", ":")), encoding="utf-8")
+    if args.metadata_output is not None:
+        args.metadata_output.parent.mkdir(parents=True, exist_ok=True)
+        args.metadata_output.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
     print(json.dumps(result["stats"], indent=2))
 
 

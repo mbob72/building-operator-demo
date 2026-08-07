@@ -29,6 +29,20 @@
 - [x] Run full Stage 1 verification.
 - [x] Present Stage 1 for approval.
 
+## Stage 2 — offline data pipeline
+
+- [x] Approve a representative 18,000-device fixture and 50,000-device stress target.
+- [x] Download and SHA-256 verify selected IFC2X3 MEP disciplines.
+- [x] Audit storeys, classes, placements, and coordinate alignment.
+- [ ] Extract all architectural floors and LOD metadata.
+- [ ] Preserve IFC provenance and normalize real device coordinates by floor.
+- [ ] Generate missing categories deterministically with a fixed seed.
+- [ ] Validate the catalog against runtime contracts and data-quality invariants.
+- [ ] Produce the 50,000-device stress fixture.
+- [ ] Write the data-quality report and reproducibility instructions.
+- [ ] Run full Stage 2 verification.
+- [ ] Present Stage 2 for approval.
+
 ## Later stages
 
-Blocked until explicit user approval. No task from Stage 2 or later may be started as part of Stage 1 cleanup.
+Blocked until explicit user approval. No task from Stage 3 or later may be started as part of Stage 2 cleanup.

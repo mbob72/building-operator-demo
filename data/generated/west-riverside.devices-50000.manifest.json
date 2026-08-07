@@ -1,0 +1,85 @@
+{
+  "catalogVersion": "west-riverside-50000-seed-20260807-v1",
+  "catalogFile": "west-riverside.devices-50000.json.gz",
+  "uncompressedBytes": 36622833,
+  "compressedBytes": 1183320,
+  "uncompressedSha256": "8953aa9f36b219110fc912b1ac0c5d3635892e3c6a18c648a7ab7b64210ee3e9",
+  "compressedSha256": "b855bbbfc3840a9b2cc01824709b408cdfc38bfa49413aa8a61d24f1eada4293",
+  "stats": {
+    "requestedDevices": 50000,
+    "seed": 20260807,
+    "actualIfcDevices": 5063,
+    "syntheticDevices": 44937,
+    "byCategory": {
+      "lighting": 19445,
+      "knx-sensors": 8889,
+      "knx-controls": 3889,
+      "fire-security": 7222,
+      "hvac": 6111,
+      "meters-controllers": 2222,
+      "access-other": 2222
+    },
+    "byFloor": {
+      "west-riverside-level-1": 8055,
+      "west-riverside-level-2": 7917,
+      "west-riverside-level-3": 7778,
+      "west-riverside-level-4": 7222,
+      "west-riverside-level-5": 6944,
+      "west-riverside-level-6": 6667,
+      "west-riverside-level-7a": 5000,
+      "west-riverside-level-7": 417
+    },
+    "byType": {
+      "access-controller": 1381,
+      "actuator": 1944,
+      "co2-sensor": 2222,
+      "electrical-controller": 561,
+      "fire-alarm-sounder": 353,
+      "hvac-terminal": 1063,
+      "hvac-unit": 5048,
+      "light": 19445,
+      "manual-pull-station": 106,
+      "meter": 1667,
+      "other": 460,
+      "presence-sensor": 4445,
+      "security-sensor": 5008,
+      "smoke-detector": 401,
+      "solar-panel": 381,
+      "sprinkler": 1348,
+      "switch": 1945,
+      "temperature-sensor": 2222
+    },
+    "byProtocol": {
+      "access-control": 1841,
+      "dali": 19445,
+      "fire-alarm": 2214,
+      "knx": 12778,
+      "modbus": 8333,
+      "security": 5008,
+      "virtual": 381
+    },
+    "byOrigin": {
+      "ifc": 5063,
+      "synthetic": 44937
+    },
+    "ifcByCategory": {
+      "access-other": 381,
+      "fire-security": 2214,
+      "hvac": 1063,
+      "lighting": 1405
+    },
+    "excludedIfcCandidates": {
+      "architecture:outside-architectural-bounds": 186,
+      "electrical:outside-architectural-bounds": 5,
+      "mechanical:outside-architectural-bounds": 1,
+      "sprinklers:outside-architectural-bounds": 6
+    },
+    "sourceSha256": {
+      "west-riverside-arc-ifc2x3.ifc": "989ace1d52f694ee94d80bd99aa81d0ff3d76cf21f34fcfd00a286ac897ed8a6",
+      "west-riverside-elec-ifc2x3.ifc": "e443ca5e13756de89f50b61256e512925ce38b76d3a20a4a17fa35ffa6650c95",
+      "west-riverside-fire-ifc2x3.ifc": "a94a9c179a5d22724576d8f4b668dec94a59b6dd447ea6c8a4ede5206c17201d",
+      "west-riverside-mech-ifc2x3.ifc": "0c0551bf150dae56702515a53d55cf7f289d3637ccd7b399b092c47b9fa9272d",
+      "west-riverside-sprinkle-ifc2x3.ifc": "99e928f6714b69afd7e709b83f96904d3e3661640df7d5d4391415bd3c977c3e"
+    }
+  }
+}

@@ -28,11 +28,16 @@
             "actuator",
             "smoke-detector",
             "heat-detector",
+            "fire-alarm-sounder",
+            "manual-pull-station",
+            "sprinkler",
             "security-sensor",
+            "hvac-terminal",
             "hvac-unit",
             "meter",
             "electrical-controller",
             "access-controller",
+            "solar-panel",
             "other"
           ]
         },
@@ -94,6 +99,101 @@
             "ifc",
             "derived",
             "synthetic"
+          ]
+        },
+        "provenance": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "const": "ifc"
+                },
+                "sourceFile": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256
+                },
+                "ifcGlobalId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "ifcType": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "ifcId": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "kind",
+                "sourceFile",
+                "ifcGlobalId",
+                "ifcType",
+                "ifcId"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "const": "derived"
+                },
+                "rule": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256
+                },
+                "sourceRefs": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  }
+                }
+              },
+              "required": [
+                "kind",
+                "rule",
+                "sourceRefs"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "const": "synthetic"
+                },
+                "generator": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256
+                },
+                "seed": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "kind",
+                "generator",
+                "seed"
+              ],
+              "additionalProperties": false
+            }
           ]
         },
         "binding": {
@@ -281,6 +381,7 @@
         "roomId",
         "position",
         "dataOrigin",
+        "provenance",
         "binding",
         "capabilities"
       ],
@@ -408,11 +509,16 @@
                   "actuator",
                   "smoke-detector",
                   "heat-detector",
+                  "fire-alarm-sounder",
+                  "manual-pull-station",
+                  "sprinkler",
                   "security-sensor",
+                  "hvac-terminal",
                   "hvac-unit",
                   "meter",
                   "electrical-controller",
                   "access-controller",
+                  "solar-panel",
                   "other"
                 ]
               },
@@ -474,6 +580,101 @@
                   "ifc",
                   "derived",
                   "synthetic"
+                ]
+              },
+              "provenance": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "const": "ifc"
+                      },
+                      "sourceFile": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 256
+                      },
+                      "ifcGlobalId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128
+                      },
+                      "ifcType": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128
+                      },
+                      "ifcId": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "sourceFile",
+                      "ifcGlobalId",
+                      "ifcType",
+                      "ifcId"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "const": "derived"
+                      },
+                      "rule": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 256
+                      },
+                      "sourceRefs": {
+                        "minItems": 1,
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 256
+                        }
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "rule",
+                      "sourceRefs"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "const": "synthetic"
+                      },
+                      "generator": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 256
+                      },
+                      "seed": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "generator",
+                      "seed"
+                    ],
+                    "additionalProperties": false
+                  }
                 ]
               },
               "binding": {
@@ -661,6 +862,7 @@
               "roomId",
               "position",
               "dataOrigin",
+              "provenance",
               "binding",
               "capabilities"
             ],

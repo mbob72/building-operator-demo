@@ -60,7 +60,8 @@
         "schema": { "type": "string" },
         "license": { "type": "string" },
         "storey": { "type": "string" },
-        "sectionHeightMeters": { "type": "number" }
+        "sectionHeightMeters": { "type": "number" },
+        "extractionMode": { "enum": ["horizontal-section", "horizontal-projection"] }
       }
     }
   },

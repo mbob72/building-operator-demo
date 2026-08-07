@@ -16,13 +16,19 @@
     "contracts:generate": "tsx scripts/contracts/generate-json-schema.ts",
     "contracts:check": "tsx scripts/contracts/generate-json-schema.ts --check",
     "data:floor": ".venv/bin/python scripts/data-pipeline/extract_floor.py --ifc data/source/west-riverside-arc-ifc2x3.ifc --storey 'Level 1' --output data/generated/west-riverside-level-1.scene.json",
+    "data:audit": ".venv/bin/python scripts/data-pipeline/audit_ifc.py --output reports/ifc-audit.json",
+    "data:floors": ".venv/bin/python scripts/data-pipeline/prepare_floors.py",
+    "data:devices": ".venv/bin/python scripts/data-pipeline/generate_devices.py --count 18000 --output data/generated/west-riverside.devices-18000.json.gz --manifest data/generated/west-riverside.devices-18000.manifest.json",
+    "data:stress": ".venv/bin/python scripts/data-pipeline/generate_devices.py --count 50000 --output data/generated/west-riverside.devices-50000.json.gz --manifest data/generated/west-riverside.devices-50000.manifest.json",
+    "data:validate": "tsx scripts/data-pipeline/validate_floors.ts && tsx scripts/data-pipeline/validate_catalog.ts data/generated/west-riverside.devices-18000.json.gz data/generated/west-riverside.devices-18000.manifest.json && tsx scripts/data-pipeline/validate_catalog.ts data/generated/west-riverside.devices-50000.json.gz data/generated/west-riverside.devices-50000.manifest.json",
+    "data:reproducibility": "scripts/data-pipeline/check_reproducibility.sh",
     "start": "node dist/server/server/index.js",
     "start:api": "tsx src/server/index.ts",
     "typecheck": "tsc -p tsconfig.server.json --noEmit && tsc -p tsconfig.web.json --noEmit",
     "test": "vitest run",
     "test:e2e": "playwright test",
     "test:production": "scripts/smoke-production",
-    "verify": "npm run contracts:check && npm run test && npm run build && npm run test:production"
+    "verify": "npm run contracts:check && npm run data:validate && npm run test && npm run build && npm run test:production"
   },
   "dependencies": {
     "@deck.gl/core": "^9.1.14",

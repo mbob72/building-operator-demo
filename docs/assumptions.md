@@ -2,7 +2,17 @@
 
 ## A-001 Device dataset size
 
-The future dataset is representative rather than exactly 20,000 devices. It should be in the tens-of-thousands range and must avoid toy-scale (~2,000) and excessive (~200,000) fixtures. The exact target will be chosen during the data stage and approved separately.
+The representative fixture contains exactly 18,000 devices after explicit Stage 2 approval. This is a reproducibility target, not a production capacity limit. A separate 50,000-device fixture remains the stress-test target; toy-scale (~2,000) and excessive (~200,000) fixtures are not representative acceptance datasets.
+
+Approved representative distribution:
+
+- 7,000 DALI lighting devices;
+- 3,200 KNX presence, temperature, and CO₂ sensors;
+- 1,400 KNX switches and actuators;
+- 2,600 fire, sprinkler, and security devices;
+- 2,200 HVAC/Modbus devices;
+- 800 meters and electrical controllers;
+- 800 access and other devices.
 
 ## A-002 Stage 0 floor geometry
 
@@ -47,3 +57,11 @@ A device binding is an opaque adapter or simulator reference with explicit prove
 ## A-012 Wire timestamps and nullable fields
 
 Wire timestamps use ISO 8601 strings with an explicit UTC offset. Lifecycle audit fields use explicit `null` before they occur, producing stable object shapes for snapshots and upserts.
+
+## A-013 MEP source schema
+
+Stage 2 uses IFC2X3 for Electrical, Fire Alarm, Mechanical, and Sprinklers. The dataset model card reports that several useful MEP property sets were lost in the IFC4 conversion. Every downloaded source is SHA-256 verified.
+
+## A-014 Device provenance
+
+IFC-origin devices retain source file, IFC class, numeric entity ID, and GlobalId. Their operational binding remains explicitly simulated and synthetic. Missing categories are generated with a fixed seed and never presented as IFC-derived protocol addresses.
