@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://building-operator.local/contracts/scene.schema.json",
+  "title": "Viewport scene query and response",
+  "$defs": {
+    "bbox": {
+      "type": "array",
+      "prefixItems": [
+        { "type": "number" },
+        { "type": "number" },
+        { "type": "number" },
+        { "type": "number" }
+      ],
+      "items": false
+    },
+    "query": {
+      "type": "object",
+      "required": ["floorId", "viewport", "zoom"],
+      "properties": {
+        "floorId": { "type": "string", "minLength": 1 },
+        "viewport": {
+          "type": "object",
+          "required": ["bbox", "width", "height"],
+          "properties": {
+            "bbox": { "$ref": "#/$defs/bbox" },
+            "width": { "type": "integer", "minimum": 1, "maximum": 16384 },
+            "height": { "type": "integer", "minimum": 1, "maximum": 16384 }
+          },
+          "additionalProperties": false
+        },
+        "zoom": { "type": "number", "minimum": -8, "maximum": 24 }
+      },
+      "additionalProperties": false
+    },
+    "feature": {
+      "type": "object",
+      "required": ["id", "kind", "geometryType", "coordinates", "bbox", "minZoom", "maxZoom"],
+      "properties": {
+        "id": { "type": "string" },
+        "kind": { "enum": ["floor-shell", "zone", "wall", "column", "door", "window", "stair", "label"] },
+        "geometryType": { "enum": ["polygon", "path", "point"] },
+        "coordinates": { "type": "array" },
+        "bbox": { "$ref": "#/$defs/bbox" },
+        "minZoom": { "type": "number" },
+        "maxZoom": { "type": "number" },
+        "width": { "type": "number", "exclusiveMinimum": 0 },
+        "text": { "type": "string" },
+        "ifcId": { "type": "integer", "minimum": 1 },
+        "ifcType": { "type": "string" },
+        "name": { "type": ["string", "null"] }
+      }
+    },
+    "source": {
+      "type": "object",
+      "required": ["project", "discipline", "file", "schema", "license", "storey", "sectionHeightMeters"],
+      "properties": {
+        "project": { "type": "string" },
+        "discipline": { "type": "string" },
+        "file": { "type": "string" },
+        "schema": { "type": "string" },
+        "license": { "type": "string" },
+        "storey": { "type": "string" },
+        "sectionHeightMeters": { "type": "number" }
+      }
+    }
+  },
+  "oneOf": [
+    { "$ref": "#/$defs/query" },
+    {
+      "type": "object",
+      "required": ["sceneVersion", "source", "floor", "request", "zoomBand", "features", "meta"],
+      "properties": {
+        "sceneVersion": { "type": "string" },
+        "source": { "$ref": "#/$defs/source" },
+        "request": { "$ref": "#/$defs/query" },
+        "zoomBand": { "enum": ["overview", "standard", "detail"] },
+        "features": { "type": "array", "items": { "$ref": "#/$defs/feature" } },
+        "meta": {
+          "type": "object",
+          "required": ["totalFeatures", "returnedFeatures"],
+          "properties": {
+            "totalFeatures": { "type": "integer", "minimum": 0 },
+            "returnedFeatures": { "type": "integer", "minimum": 0 }
+          }
+        }
+      }
+    }
+  ]
+}

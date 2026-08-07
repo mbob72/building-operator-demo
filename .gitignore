@@ -1,0 +1,9 @@
+node_modules/
+.venv/
+data/source/*.ifc
+dist/
+coverage/
+playwright-report/
+test-results/
+*.log
+.DS_Store
