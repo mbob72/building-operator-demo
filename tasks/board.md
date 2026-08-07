@@ -13,7 +13,7 @@
 - [x] Capture large-object rendering and realtime-update guardrails.
 - [x] Prepare GitHub Actions and Render live-demo configuration.
 - [x] Create the approved public GitHub repository.
-- [ ] Create the Render service from the committed Blueprint.
+- [x] Create and verify the Render service from the committed Blueprint.
 - [x] Present Stage 0 for approval.
 
 ## Later stages

@@ -14,6 +14,8 @@ Browser
 
 The service is configured by `render.yaml`. GitHub Actions must pass before Render deploys a commit.
 
+Public URL: <https://building-operator-demo.onrender.com>.
+
 ## Local production verification
 
 ```bash

@@ -33,6 +33,8 @@ Open <http://127.0.0.1:4174>. `npm run verify` includes a production smoke test 
 
 ## Live demo
 
+Open the public Stage 0 demo at <https://building-operator-demo.onrender.com>.
+
 The repository includes a Render Blueprint in `render.yaml` and GitHub Actions in `.github/workflows/ci.yml`. Render is configured to deploy the `main` branch only after CI checks pass. See [`docs/deployment.md`](docs/deployment.md).
 
 ## Stage 0 architecture
