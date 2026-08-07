@@ -2,12 +2,13 @@
 
 ## Текущий статус
 
-- Текущий этап: **этап 0 завершён и представлен для приёмки**.
+- Текущий этап: **этап 0 завершён и принят**.
 - Следующий этап не начат.
 - Разработка ведётся последовательно одним coding agent.
 - Переход между этапами выполняется только после явного апрува пользователя.
 - Количество устройств не является строгой константой `20 000`: нужен репрезентативный набор порядка десятков тысяч, без ухода в игрушечный масштаб около 2 000 или избыточный масштаб около 200 000.
 - Для performance-проверки предусмотрен отдельный fixture на 50 000 устройств.
+- Создан публичный GitHub-репозиторий и подготовлен GitHub-to-Render live-demo pipeline; Render service ещё не создан.
 
 ## Этапы разработки
 
@@ -236,3 +237,14 @@ npm run dev:web -- --host 0.0.0.0
 - `docs/adr/0001-viewport-scene-json.md` — scene API ADR.
 - `docs/adr/0002-many-object-rendering.md` — rendering ADR.
 - `reports/stage-zero.md` — краткий технический отчёт этапа.
+
+### Дополнение: готовность live-demo
+
+- Fastify подготовлен к раздаче production Vite build и API из одного процесса.
+- Добавлена компиляция server-side TypeScript в `dist/server`.
+- Добавлена production-команда `npm start`.
+- Добавлен автоматический production smoke test.
+- Добавлен `render.yaml` с health check и деплоем после успешных CI checks.
+- Добавлен GitHub Actions workflow с verify и Chromium E2E jobs.
+- Deployment-решение зафиксировано в `docs/adr/0003-render-live-demo.md`.
+- Создан публичный репозиторий `mbob72/building-operator-demo`; создание Render service остаётся последним шагом публикации live-demo.

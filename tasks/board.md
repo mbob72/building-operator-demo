@@ -11,7 +11,10 @@
 - [x] Install dependencies and run verification.
 - [x] Run browser smoke test.
 - [x] Capture large-object rendering and realtime-update guardrails.
-- [ ] Present Stage 0 for approval.
+- [x] Prepare GitHub Actions and Render live-demo configuration.
+- [x] Create the approved public GitHub repository.
+- [ ] Create the Render service from the committed Blueprint.
+- [x] Present Stage 0 for approval.
 
 ## Later stages
 

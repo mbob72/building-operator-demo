@@ -20,6 +20,21 @@ npm run verify
 npm run test:e2e
 ```
 
+## Production mode
+
+The production server serves both the built frontend and `/api/*` from one origin:
+
+```bash
+npm run build
+NODE_ENV=production HOST=127.0.0.1 PORT=4174 npm start
+```
+
+Open <http://127.0.0.1:4174>. `npm run verify` includes a production smoke test for the HTML entry point and viewport scene API.
+
+## Live demo
+
+The repository includes a Render Blueprint in `render.yaml` and GitHub Actions in `.github/workflows/ci.yml`. Render is configured to deploy the `main` branch only after CI checks pass. See [`docs/deployment.md`](docs/deployment.md).
+
 ## Stage 0 architecture
 
 The browser converts the current orthographic view to a world-coordinate bounding box and sends it with the current zoom to `POST /api/scene/query`. The API filters floor geometry by bbox and feature zoom range. Panning or zooming triggers a debounced request and replaces the WebGL layers with the returned scene subset.
