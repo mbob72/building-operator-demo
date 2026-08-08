@@ -1,6 +1,6 @@
 # Building operator MVP
 
-Stage 0 proves a viewport-aware scene delivery contract and a browser viewer for the real Level 1 architectural geometry of West Riverside Hospital. Stage 1 adds the product model and backend-independent contracts for future devices, telemetry, alarms, commands, and realtime recovery; those operational features are not implemented yet.
+Stage 0 proves a viewport-aware scene delivery contract and browser viewer for real West Riverside Hospital geometry. Stage 1 defines the product model and backend-independent operational contracts. Stage 2 adds a reproducible offline pipeline for eight architectural floors, a representative 18,000-device catalog, and a separate 50,000-device stress fixture. Stage 3 renders 2,900 Level 1 devices with an instanced deck.gl `IconLayer`, texture atlas, GPU picking, and a single selected-device card.
 
 ## Run
 
@@ -27,7 +27,7 @@ npm run contracts:generate
 npm run contracts:check
 ```
 
-See [`docs/product.md`](docs/product.md), [`docs/architecture.md`](docs/architecture.md), and [`reports/stage-one.md`](reports/stage-one.md) for the Stage 1 baseline.
+See [`docs/product.md`](docs/product.md), [`docs/architecture.md`](docs/architecture.md), [`docs/frontend-architecture.md`](docs/frontend-architecture.md), [`docs/backend-architecture.md`](docs/backend-architecture.md), [`reports/stage-one.md`](reports/stage-one.md), [`reports/data-quality.md`](reports/data-quality.md), and [`reports/stage-three.md`](reports/stage-three.md).
 
 ## Production mode
 
@@ -52,7 +52,7 @@ The browser converts the current orthographic view to a world-coordinate boundin
 
 The browser does not parse IFC. The checked-in compact scene was produced offline from `arc_ifc2x3.ifc` using a horizontal section 1.2 metres above Level 1. It contains walls, columns, doors, windows/curtain walls, and stairs where they intersect the section.
 
-## Reproduce the floor scene
+## Reproduce the offline data
 
 The source IFC is about 80 MB and is excluded from version control. Python 3.11 is recommended because binary IfcOpenShell wheels are available for it.
 
@@ -64,3 +64,15 @@ npm run data:floor
 ```
 
 The source model is West Riverside Hospital from IFC-Bench/OpenIFC Model Repository and is licensed under CC BY 3.0. The downloaded source checksum and attribution files live under `data/source`.
+
+Generate and validate the full Stage 2 dataset with:
+
+```bash
+npm run data:floors
+npm run data:devices
+npm run data:stress
+npm run data:validate
+npm run data:reproducibility
+```
+
+The representative fixture contains exactly 18,000 devices using seed `20260807`; this is a reproducibility target, not a product capacity limit. The stress fixture contains 50,000 devices. Both catalogs combine provenance-preserving IFC elements with explicitly marked synthetic devices.

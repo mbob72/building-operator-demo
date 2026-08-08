@@ -1,7 +1,10 @@
 import Fastify from 'fastify';
 import fastifyStatic from '@fastify/static';
+import { createHash } from 'node:crypto';
 import { resolve } from 'node:path';
+import { CatalogQuerySchema } from '../shared/api-contracts.js';
 import { SceneQuerySchema, type BBox, type SceneFeature } from '../shared/scene-contracts.js';
+import { deviceCatalog, selectCatalogFloors } from './device-catalog.js';
 import { floor, sceneFeatures, source } from './scene-fixture.js';
 
 interface AppOptions {
@@ -27,6 +30,35 @@ export const buildApp = (options: AppOptions = {}) => {
   app.get('/api/health', async () => ({ status: 'ok' }));
 
   app.get('/api/floors', async () => ({ floors: [floor] }));
+
+  app.get('/api/v1/catalog', async (request, reply) => {
+    const raw = request.query as { buildingId?: unknown; floorIds?: unknown };
+    const parsed = CatalogQuerySchema.safeParse({
+      buildingId: raw.buildingId,
+      floorIds: typeof raw.floorIds === 'string' ? [raw.floorIds] : raw.floorIds,
+    });
+    if (!parsed.success) {
+      return reply.status(400).send({
+        error: 'invalid_catalog_query',
+        details: parsed.error.issues,
+      });
+    }
+    if (parsed.data.buildingId !== deviceCatalog.building.id) {
+      return reply.status(404).send({ error: 'building_not_found' });
+    }
+
+    const floorIds = parsed.data.floorIds ?? deviceCatalog.floors.map((item) => item.id);
+    if (floorIds.some((floorId) => !deviceCatalog.floors.some((item) => item.id === floorId))) {
+      return reply.status(404).send({ error: 'floor_not_found' });
+    }
+    const etag = `"${createHash('sha256')
+      .update(`${deviceCatalog.catalogVersion}:${floorIds.join(',')}`)
+      .digest('base64url')}"`;
+    reply.header('etag', etag);
+    reply.header('cache-control', 'public, max-age=300, stale-while-revalidate=60');
+    if (request.headers['if-none-match'] === etag) return reply.status(304).send();
+    return selectCatalogFloors(floorIds);
+  });
 
   app.post('/api/scene/query', async (request, reply) => {
     const parsed = SceneQuerySchema.safeParse(request.body);

@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
+import { CatalogResponseSchema } from '../../src/shared/api-contracts';
 import { SceneResponseSchema } from '../../src/shared/scene-contracts';
 import { buildApp } from '../../src/server/app';
 
@@ -78,6 +79,45 @@ describe('scene API', () => {
         viewport: { bbox: [0, 0, 100, 100], width: 100, height: 100 },
         zoom: 0,
       },
+    });
+
+    expect(invalid.statusCode).toBe(400);
+    expect(missing.statusCode).toBe(404);
+  });
+});
+
+describe('device catalog API', () => {
+  it('returns stable metadata for only the requested floor', async () => {
+    const response = await createApp().inject({
+      method: 'GET',
+      url: '/api/v1/catalog?buildingId=west-riverside&floorIds=west-riverside-level-1',
+    });
+
+    expect(response.statusCode).toBe(200);
+    const catalog = CatalogResponseSchema.parse(response.json());
+    expect(catalog.floors.map((floor) => floor.id)).toEqual(['west-riverside-level-1']);
+    expect(catalog.totalDevices).toBe(2_900);
+    expect(catalog.devices).toHaveLength(2_900);
+    expect(catalog.devices.every((device) => device.floorId === 'west-riverside-level-1')).toBe(true);
+    expect(catalog.devices.some((device) => device.dataOrigin === 'ifc')).toBe(true);
+    expect(catalog.devices.some((device) => device.dataOrigin === 'synthetic')).toBe(true);
+    expect(catalog.devices.every((device) => !('status' in device))).toBe(true);
+    expect(response.headers.etag).toMatch(/^".+"$/);
+
+    const cached = await createApp().inject({
+      method: 'GET',
+      url: '/api/v1/catalog?buildingId=west-riverside&floorIds=west-riverside-level-1',
+      headers: { 'if-none-match': response.headers.etag },
+    });
+    expect(cached.statusCode).toBe(304);
+  });
+
+  it('rejects invalid catalog queries and unknown floors', async () => {
+    const app = createApp();
+    const invalid = await app.inject({ method: 'GET', url: '/api/v1/catalog?buildingId=' });
+    const missing = await app.inject({
+      method: 'GET',
+      url: '/api/v1/catalog?buildingId=west-riverside&floorIds=missing',
     });
 
     expect(invalid.statusCode).toBe(400);

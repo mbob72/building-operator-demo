@@ -12,13 +12,13 @@ export default defineConfig({
     {
       command: 'exec node --import tsx src/server/index.ts',
       url: 'http://127.0.0.1:3001/api/health',
-      reuseExistingServer: false,
+      reuseExistingServer: true,
       timeout: 120_000,
     },
     {
       command: 'exec ./node_modules/.bin/vite --config vite.config.ts',
       url: 'http://127.0.0.1:5173',
-      reuseExistingServer: false,
+      reuseExistingServer: true,
       timeout: 120_000,
     },
   ],

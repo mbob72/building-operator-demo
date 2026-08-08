@@ -53,8 +53,8 @@ All new operational endpoints use `/api/v1`. The Stage 0 `/api/scene/query` endp
 
 | Method and path | Purpose | Contract |
 | --- | --- | --- |
-| `GET /api/v1/catalog?buildingId&floorId*` | Cacheable stable building/floor/device metadata | `CatalogQuery` -> `CatalogResponse` |
-| `GET /api/v1/state/snapshot?buildingId&floorId*` | Authoritative hot-state replacement and stream cursor | `StateSnapshotQuery` -> `StateSnapshot` |
+| `GET /api/v1/catalog?buildingId&floorIds*` | Cacheable stable building/floor/device metadata | `CatalogQuery` -> `CatalogResponse` |
+| `GET /api/v1/state/snapshot?buildingId&floorIds*` | Authoritative hot-state replacement and stream cursor | `StateSnapshotQuery` -> `StateSnapshot` |
 | `POST /api/v1/alarms/:alarmId/acknowledge` | Idempotent alarm acknowledgement | `AcknowledgeAlarmRequest` -> `AcknowledgeAlarmResponse` |
 | `POST /api/v1/commands` | Idempotent simulated command creation | `CreateCommandRequest` -> `CreateCommandResponse` |
 | `GET /api/v1/commands/:commandId` | Command status fallback when realtime is unavailable | `CommandResponse` |
@@ -110,6 +110,6 @@ transport: pending -> accepted -> executed
 - `npm run contracts:check` fails when committed generated schemas are stale.
 - ADR-0004 defines state separation; ADR-0005 defines realtime recovery.
 
-## Deferred implementation
+## Stage 3 implementation boundary
 
-Stage 1 does not select a hot-store library, implement WebSocket transport, add TanStack Query/Zustand, or expose the new endpoints. Those dependencies and implementations belong to their approved vertical-slice stages; the contracts above are designed to keep those choices replaceable.
+Stage 3 exposes the stable catalog endpoint and renders one floor through a deck.gl `IconLayer`. It intentionally does not select a hot-store library, implement WebSocket transport, or add telemetry/status to stable metadata. Those dependencies and implementations remain in their approved later stages; the contracts above keep those choices replaceable.

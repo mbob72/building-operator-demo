@@ -34,15 +34,26 @@
 - [x] Approve a representative 18,000-device fixture and 50,000-device stress target.
 - [x] Download and SHA-256 verify selected IFC2X3 MEP disciplines.
 - [x] Audit storeys, classes, placements, and coordinate alignment.
-- [ ] Extract all architectural floors and LOD metadata.
-- [ ] Preserve IFC provenance and normalize real device coordinates by floor.
-- [ ] Generate missing categories deterministically with a fixed seed.
-- [ ] Validate the catalog against runtime contracts and data-quality invariants.
-- [ ] Produce the 50,000-device stress fixture.
-- [ ] Write the data-quality report and reproducibility instructions.
-- [ ] Run full Stage 2 verification.
-- [ ] Present Stage 2 for approval.
+- [x] Extract all architectural floors and LOD metadata.
+- [x] Preserve IFC provenance and normalize real device coordinates by floor.
+- [x] Generate missing categories deterministically with a fixed seed.
+- [x] Validate the catalog against runtime contracts and data-quality invariants.
+- [x] Produce the 50,000-device stress fixture.
+- [x] Write the data-quality report and reproducibility instructions.
+- [x] Run full Stage 2 verification.
+- [x] Present Stage 2 for approval.
+
+## Stage 3 — minimal device vertical slice
+
+- [x] Load stable device metadata for one floor through the API.
+- [x] Render one floor's devices with deck.gl `IconLayer` and a texture atlas.
+- [x] Use GPU picking without per-device React/DOM components.
+- [x] Open a card for the selected device.
+- [x] Add API, UI, and browser tests for the vertical slice.
+- [x] Run full Stage 3 verification.
+- [x] Present Stage 3 for approval.
+- [ ] Receive explicit Stage 3 approval.
 
 ## Later stages
 
-Blocked until explicit user approval. No task from Stage 3 or later may be started as part of Stage 2 cleanup.
+Blocked until explicit user approval after Stage 3.

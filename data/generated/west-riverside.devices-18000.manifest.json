@@ -1,15 +1,15 @@
 {
   "catalogVersion": "west-riverside-18000-seed-20260807-v1",
   "catalogFile": "west-riverside.devices-18000.json.gz",
-  "uncompressedBytes": 13387086,
-  "compressedBytes": 471165,
-  "uncompressedSha256": "97c4bb8ed63c9db4242215c700c514babd424bc2c924837709802c93a5ccdb15",
-  "compressedSha256": "9398159ffbc7f0be37f3aac31a7955098f1a326e04a5ba5759d7584a5d19d2ec",
+  "uncompressedBytes": 13389453,
+  "compressedBytes": 471299,
+  "uncompressedSha256": "5d8107ff4a843ae2f31d97054ac2c2b164d6eb0b968972443f3374782da25e52",
+  "compressedSha256": "42c31c14ce39830816ba4677894d8bab76b866d1ae6fbde4ebb67b062d4b9639",
   "stats": {
     "requestedDevices": 18000,
     "seed": 20260807,
-    "actualIfcDevices": 5063,
-    "syntheticDevices": 12937,
+    "actualIfcDevices": 5078,
+    "syntheticDevices": 12922,
     "byCategory": {
       "lighting": 7000,
       "knx-sensors": 3200,
@@ -30,7 +30,7 @@
       "west-riverside-level-7": 150
     },
     "byType": {
-      "access-controller": 315,
+      "access-controller": 304,
       "actuator": 700,
       "co2-sensor": 800,
       "electrical-controller": 206,
@@ -40,37 +40,41 @@
       "light": 7000,
       "manual-pull-station": 106,
       "meter": 600,
-      "other": 104,
+      "other": 101,
       "presence-sensor": 1600,
       "security-sensor": 386,
       "smoke-detector": 401,
-      "solar-panel": 381,
+      "solar-panel": 395,
       "sprinkler": 1348,
       "switch": 700,
       "temperature-sensor": 800
     },
     "byProtocol": {
-      "access-control": 419,
+      "access-control": 405,
       "dali": 7000,
       "fire-alarm": 2214,
       "knx": 4600,
       "modbus": 3000,
       "security": 386,
-      "virtual": 381
+      "virtual": 395
     },
     "byOrigin": {
-      "ifc": 5063,
-      "synthetic": 12937
+      "ifc": 5078,
+      "synthetic": 12922
     },
     "ifcByCategory": {
-      "access-other": 381,
+      "access-other": 395,
       "fire-security": 2214,
       "hvac": 1063,
-      "lighting": 1405
+      "lighting": 1406
+    },
+    "recoveredIfcCandidates": {
+      "architecture:geometry-centroid-from-outside-placement": 14,
+      "electrical:geometry-centroid-from-outside-placement": 1
     },
     "excludedIfcCandidates": {
-      "architecture:outside-architectural-bounds": 186,
-      "electrical:outside-architectural-bounds": 5,
+      "architecture:outside-architectural-bounds": 172,
+      "electrical:outside-architectural-bounds": 4,
       "mechanical:outside-architectural-bounds": 1,
       "sprinklers:outside-architectural-bounds": 6
     },

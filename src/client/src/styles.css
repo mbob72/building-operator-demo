@@ -104,6 +104,53 @@ h1 { margin: 0; font-size: clamp(20px, 2vw, 28px); font-weight: 500; letter-spac
 .status-dot { width: 6px; height: 6px; border-radius: 50%; background: #63d0a1; box-shadow: 0 0 8px #63d0a1; }
 .status-dot--error { background: #ff6b66; box-shadow: 0 0 8px #ff6b66; }
 
+.device-card {
+  position: absolute;
+  top: 66px;
+  right: 14px;
+  z-index: 3;
+  width: min(310px, calc(100% - 28px));
+  padding: 18px;
+  border: 1px solid #3a5a60;
+  color: #dce9e8;
+  background: rgba(7, 19, 23, 0.96);
+  box-shadow: 0 18px 54px rgba(0, 0, 0, 0.42);
+}
+
+.device-card__close {
+  position: absolute;
+  top: 8px;
+  right: 9px;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  color: #8fb1b0;
+  background: transparent;
+  font-size: 22px;
+  cursor: pointer;
+}
+
+.device-card__close:hover { color: #fff; }
+.device-card__eyebrow {
+  margin: 0 32px 7px 0;
+  color: #62d1c7;
+  font: 500 9px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.16em;
+}
+.device-card h2 { margin: 0 32px 16px 0; font-size: 17px; font-weight: 550; line-height: 1.25; }
+.device-card dl { display: grid; gap: 7px; margin: 0; }
+.device-card dl div { display: flex; justify-content: space-between; gap: 18px; }
+.device-card dt,
+.device-card dd { margin: 0; font: 11px/1.35 ui-monospace, SFMono-Regular, Menlo, monospace; }
+.device-card dt { color: #708e90; }
+.device-card dd { color: #bad0cf; text-align: right; }
+.device-card__id {
+  margin: 15px 0 0;
+  overflow-wrap: anywhere;
+  color: #587175;
+  font: 9px/1.35 ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
 .footer {
   display: flex;
   justify-content: space-between;
@@ -120,4 +167,5 @@ h1 { margin: 0; font-size: clamp(20px, 2vw, 28px); font-weight: 500; letter-spac
   .topbar__meta { display: none; }
   .workspace { margin: 10px; }
   .footer { display: none; }
+  .device-card { top: 60px; }
 }

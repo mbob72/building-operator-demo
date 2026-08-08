@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 import ifcopenshell
+import ifcopenshell.geom
 import ifcopenshell.util.placement
 import ifcopenshell.util.unit
 from shapely import concave_hull
@@ -102,6 +103,26 @@ def placement_position(element: Any, unit_scale: float) -> tuple[float, float] |
     except Exception:
         return None
     return float(matrix[0, 3]) * unit_scale, float(matrix[1, 3]) * unit_scale
+
+
+def geometry_position(
+    element: Any,
+    settings: ifcopenshell.geom.settings,
+) -> tuple[float, float] | None:
+    """Return a stable world-space centroid when ObjectPlacement is not representative."""
+    try:
+        shape = ifcopenshell.geom.create_shape(settings, element)
+        vertices = shape.geometry.verts
+    except Exception:
+        return None
+    points = [
+        (float(vertices[index]), float(vertices[index + 1]))
+        for index in range(0, len(vertices), 3)
+    ]
+    if not points:
+        return None
+    centroid = MultiPoint(points).convex_hull.centroid
+    return float(centroid.x), float(centroid.y)
 
 
 def channel(
@@ -254,9 +275,10 @@ def ifc_device(
 def load_ifc_devices(
     source_dir: Path,
     floors_by_id: dict[str, dict[str, Any]],
-) -> tuple[list[tuple[str, dict[str, Any]]], Counter[str]]:
+) -> tuple[list[tuple[str, dict[str, Any]]], Counter[str], Counter[str]]:
     devices: list[tuple[str, dict[str, Any]]] = []
     excluded: Counter[str] = Counter()
+    recovered: Counter[str] = Counter()
 
     def include(
         model: Any,
@@ -266,25 +288,38 @@ def load_ifc_devices(
         category: str,
         protocol: str,
         device_type: str,
+        settings: ifcopenshell.geom.settings,
     ) -> None:
         storey = contained_storey(element)
         floor_id = floor_name(storey)
         if floor_id is None or floor_id not in floors_by_id:
             excluded[f"{discipline}:unmapped-storey"] += 1
             return
-        world = placement_position(element, ifcopenshell.util.unit.calculate_unit_scale(model))
-        if world is None:
-            excluded[f"{discipline}:missing-placement"] += 1
-            return
         floor = floors_by_id[floor_id]
-        local = (
-            world[0] - floor["worldOrigin"][0],
-            world[1] - floor["worldOrigin"][1],
-        )
         _, _, max_x, max_y = floor["bounds"]
-        if not (0 <= local[0] <= max_x and 0 <= local[1] <= max_y):
-            excluded[f"{discipline}:outside-architectural-bounds"] += 1
-            return
+
+        def floor_local(world_position: tuple[float, float]) -> tuple[float, float]:
+            return (
+                world_position[0] - floor["worldOrigin"][0],
+                world_position[1] - floor["worldOrigin"][1],
+            )
+
+        def is_inside(local_position: tuple[float, float]) -> bool:
+            return 0 <= local_position[0] <= max_x and 0 <= local_position[1] <= max_y
+
+        placement = placement_position(element, ifcopenshell.util.unit.calculate_unit_scale(model))
+        local = floor_local(placement) if placement is not None else None
+        if local is None or not is_inside(local):
+            centroid = geometry_position(element, settings)
+            centroid_local = floor_local(centroid) if centroid is not None else None
+            if centroid_local is not None and is_inside(centroid_local):
+                reason = "missing-placement" if placement is None else "outside-placement"
+                recovered[f"{discipline}:geometry-centroid-from-{reason}"] += 1
+                local = centroid_local
+            else:
+                reason = "missing-placement" if placement is None else "outside-architectural-bounds"
+                excluded[f"{discipline}:{reason}"] += 1
+                return
         devices.append((
             category,
             ifc_device(
@@ -341,6 +376,8 @@ def load_ifc_devices(
     for discipline, predicate, category, protocol, type_for in configurations:
         source_file = SOURCE_FILES[discipline]
         model = ifcopenshell.open(source_dir / source_file)
+        settings = ifcopenshell.geom.settings()
+        settings.set(settings.USE_WORLD_COORDS, True)
         for product in model.by_type("IfcProduct"):
             if predicate(product):
                 include(
@@ -351,9 +388,10 @@ def load_ifc_devices(
                     category,
                     protocol,
                     type_for(product),
+                    settings,
                 )
 
-    return devices, excluded
+    return devices, excluded, recovered
 
 
 def placement_region(scene_path: Path) -> Polygon:
@@ -471,7 +509,7 @@ def generate(
     target_categories = scaled_counts(CATEGORY_TARGETS, count)
     target_floors = scaled_counts(FLOOR_TARGETS, count)
 
-    ifc_entries, excluded = load_ifc_devices(source_dir, floors_by_id)
+    ifc_entries, excluded, recovered = load_ifc_devices(source_dir, floors_by_id)
     actual_by_category = Counter(category for category, _ in ifc_entries)
     actual_by_floor = Counter(device["floorId"] for _, device in ifc_entries)
 
@@ -535,6 +573,7 @@ def generate(
         "byProtocol": dict(sorted(Counter(device["protocol"] for device in devices).items())),
         "byOrigin": dict(sorted(Counter(device["dataOrigin"] for device in devices).items())),
         "ifcByCategory": dict(sorted(actual_by_category.items())),
+        "recoveredIfcCandidates": dict(sorted(recovered.items())),
         "excludedIfcCandidates": dict(sorted(excluded.items())),
         "sourceSha256": {
             source_file: sha256_file(source_dir / source_file)

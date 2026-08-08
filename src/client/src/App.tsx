@@ -26,13 +26,13 @@ export const App = () => {
     <main className="app-shell">
       <header className="topbar">
         <div>
-          <p className="eyebrow">OPERATOR SCENE / STAGE 0</p>
+          <p className="eyebrow">OPERATOR SCENE / STAGE 3</p>
           <h1>{floor?.name ?? 'Loading floor…'}</h1>
         </div>
         <div className="topbar__meta">
           <span>VIEWPORT API</span>
           <span>REAL IFC FLOOR</span>
-          <span>NO DEVICES</span>
+          <span>GPU DEVICE LAYER</span>
         </div>
       </header>
       <section className="workspace">
@@ -41,7 +41,7 @@ export const App = () => {
       </section>
       <footer className="footer">
         <span>Drag to pan · wheel or controls to zoom</span>
-        <span>Scene geometry is filtered by viewport and zoom on the server</span>
+        <span>Floor geometry and stable device metadata are separate layers</span>
       </footer>
     </main>
   );
