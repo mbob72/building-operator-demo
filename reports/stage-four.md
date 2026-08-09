@@ -23,6 +23,9 @@
 - Warning/critical вынесены в верхний device layer, увеличены и видимы при любом renderer LOD.
 - Device/label LOD ограничивает размер и число подписей без per-device DOM.
 - GPU picking и одна selected-device card работают в обоих режимах.
+- `OperatorWorkspace` и `FloorScene` оставлены тонкими компонентами-композициями; query/filter orchestration, camera/request lifecycle и layer construction вынесены в специализированные хуки.
+- Floor и building renderer используют общие zoom/fit controls и общую фабрику status-aware device layers.
+- Добавлены чистые unit-границы для device partition, filters и label LOD, а также hook-тест debounce/abort lifecycle floor scene.
 
 ## Статический status dataset
 
@@ -43,7 +46,7 @@ Snapshot детерминирован по `deviceId`, имеет sequence `0` �
 | Проверка | Результат |
 |---|---|
 | TypeScript strict typecheck | пройдено |
-| Unit/contract/API tests | 20 из 20 пройдено |
+| Unit/contract/API tests | 31 из 31 пройдено |
 | Chromium workflow E2E | пройдено |
 | Production build | пройдено |
 | Production HTML/scene/catalog/snapshot smoke | пройдено |

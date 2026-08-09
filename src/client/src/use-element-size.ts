@@ -1,8 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 
+export interface ElementSize {
+  width: number;
+  height: number;
+}
+
 export const useElementSize = <T extends HTMLElement>() => {
   const ref = useRef<T>(null);
-  const [size, setSize] = useState({ width: 0, height: 0 });
+  const [size, setSize] = useState<ElementSize>({ width: 0, height: 0 });
 
   useEffect(() => {
     if (!ref.current) return;

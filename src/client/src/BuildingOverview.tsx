@@ -3,21 +3,15 @@ import { useQueries } from '@tanstack/react-query';
 import DeckGL from '@deck.gl/react';
 import type { DeckGLRef } from '@deck.gl/react';
 import { OrthographicView } from '@deck.gl/core';
-import { IconLayer, PathLayer, PolygonLayer, TextLayer } from '@deck.gl/layers';
+import { PathLayer, PolygonLayer, TextLayer } from '@deck.gl/layers';
 import type {
   DeviceMetadata,
-  DeviceStatus,
   DeviceTelemetry,
 } from '../../shared/domain-contracts';
 import type { FloorSummary, SceneFeature } from '../../shared/scene-contracts';
 import { DeviceCard } from './DeviceCard';
-import {
-  colorForDevice,
-  deviceSizeForZoom,
-  iconForDevice,
-  iconMapping,
-  isPriorityStatus,
-} from './device-visuals';
+import { createDeviceIconLayer, partitionDeviceItems } from './device-layers';
+import { SceneControls } from './SceneControls';
 import { featureColor, representativeZoom, zoomBandFor } from './scene-visuals';
 import { loadScene } from './scene-api';
 import { fitBounds, viewStateToBBox, type SceneViewState } from './viewport';
@@ -50,11 +44,6 @@ interface OffsetDevice {
   device: DeviceMetadata;
   offset: Offset;
 }
-
-const statusOf = (
-  telemetryByDeviceId: ReadonlyMap<string, DeviceTelemetry>,
-  deviceId: string,
-): DeviceStatus => telemetryByDeviceId.get(deviceId)?.status ?? 'unknown';
 
 const buildLayout = (floors: FloorSummary[], columns: number) => {
   const gap = 26;
@@ -149,15 +138,10 @@ export const BuildingOverview = ({
     return floorLayout ? [{ device, offset: floorLayout.offset }] : [];
   }), [devices, layoutByFloorId]);
 
-  const deviceGroups = useMemo(() => {
-    const normal: OffsetDevice[] = [];
-    const priority: OffsetDevice[] = [];
-    for (const item of offsetDevices) {
-      if (isPriorityStatus(statusOf(telemetryByDeviceId, item.device.id))) priority.push(item);
-      else normal.push(item);
-    }
-    return { normal, priority };
-  }, [offsetDevices, telemetryByDeviceId]);
+  const deviceGroups = useMemo(
+    () => partitionDeviceItems(offsetDevices, (item) => item.device, telemetryByDeviceId),
+    [offsetDevices, telemetryByDeviceId],
+  );
 
   const deviceLabels = useMemo(() => {
     const result = new Map<string, OffsetDevice>();
@@ -182,33 +166,14 @@ export const BuildingOverview = ({
       item.device.position.x + item.offset[0],
       item.device.position.y + item.offset[1],
     ];
-    const deviceLayer = (id: string, data: OffsetDevice[]) => new IconLayer<OffsetDevice>({
-      id,
-      data,
-      iconAtlas: '/device-atlas.svg',
-      iconMapping,
-      getIcon: (item) => iconForDevice(item.device),
+    const deviceLayerOptions = {
+      getDevice: (item: OffsetDevice) => item.device,
       getPosition: position,
-      getColor: (item) => colorForDevice(
-        item.device,
-        statusOf(telemetryByDeviceId, item.device.id),
-        item.device.id === selectedDevice?.id,
-      ),
-      getSize: (item) => deviceSizeForZoom(
-        viewState.zoom,
-        statusOf(telemetryByDeviceId, item.device.id),
-      ),
-      sizeUnits: 'pixels',
+      telemetryByDeviceId,
+      selectedDeviceId: selectedDevice?.id,
+      zoom: viewState.zoom,
       sizeMinPixels: 4,
-      sizeMaxPixels: 22,
-      pickable: true,
-      autoHighlight: true,
-      highlightColor: [255, 255, 255, 90],
-      updateTriggers: {
-        getColor: [selectedDevice?.id, telemetryByDeviceId],
-        getSize: [viewState.zoom, telemetryByDeviceId],
-      },
-    });
+    };
 
     return [
       new PolygonLayer<OffsetFeature<PolygonFeature>>({
@@ -260,8 +225,16 @@ export const BuildingOverview = ({
         getTextAnchor: 'middle',
         getAlignmentBaseline: 'center',
       }),
-      deviceLayer('overview-devices', deviceGroups.normal),
-      deviceLayer('overview-priority-devices', deviceGroups.priority),
+      createDeviceIconLayer({
+        ...deviceLayerOptions,
+        id: 'overview-devices',
+        data: deviceGroups.normal,
+      }),
+      createDeviceIconLayer({
+        ...deviceLayerOptions,
+        id: 'overview-priority-devices',
+        data: deviceGroups.priority,
+      }),
       new TextLayer<OffsetDevice>({
         id: 'overview-device-labels',
         data: deviceLabels,
@@ -327,11 +300,7 @@ export const BuildingOverview = ({
           });
         }}
       />
-      <div className="scene__tools">
-        <button type="button" onClick={() => setViewState((current) => ({ ...current, zoom: Math.min(current.maxZoom, current.zoom + 0.35) }))} aria-label="Zoom in">+</button>
-        <button type="button" onClick={() => setViewState((current) => ({ ...current, zoom: Math.max(current.minZoom, current.zoom - 0.35) }))} aria-label="Zoom out">−</button>
-        <button type="button" className="scene__fit" onClick={resetView}>Fit</button>
-      </div>
+      <SceneControls viewState={viewState} setViewState={setViewState} onFit={resetView} />
       <div className="scene__status" aria-live="polite">
         <span className={`status-dot ${queryError ? 'status-dot--error' : ''}`} />
         {queryError instanceof Error

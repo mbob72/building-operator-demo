@@ -20,11 +20,13 @@ QueryClientProvider
 └── App
     ├── useQuery(GET /api/floors)
     └── OperatorWorkspace
-        ├── Zustand: mode, floor, selection, search, filters
-        ├── useQuery(GET /api/v1/catalog)
-        ├── useQuery(GET /api/v1/state/snapshot)
+        ├── useOperatorWorkspaceModel
+        │   ├── Zustand: mode, floor, selection, search, filters
+        │   ├── useQuery(GET /api/v1/catalog)
+        │   └── useQuery(GET /api/v1/state/snapshot)
         ├── OperatorToolbar
         └── FloorScene | BuildingOverview
+            ├── scene controller / layer hooks
             ├── architecture layers
             │   ├── PolygonLayer
             │   ├── PathLayer
@@ -88,16 +90,16 @@ flowchart LR
 |---|---|---|
 | Floors, catalog, snapshot, overview scenes | TanStack Query | серверные документы, cache/dedup/stale policy |
 | Mode, selected floor/device, search, filters | Zustand `operator-store` | общее UI-состояние без prop drilling |
-| Camera `viewState`, текущая floor scene | `FloorScene` / `BuildingOverview` | локальное высокочастотное состояние renderer |
-| Indexed telemetry lookup | `OperatorWorkspace` memoized `Map` | O(1) соединение metadata и status |
-| Filtered device array | `OperatorWorkspace` memoized selector | один массив данных для GPU layers |
+| Camera `viewState`, текущая floor scene | `useFloorScene` / `BuildingOverview` | локальное высокочастотное состояние renderer |
+| Indexed telemetry lookup | `useOperatorWorkspaceModel` memoized `Map` | O(1) соединение metadata и status |
+| Filtered device array | `useOperatorWorkspaceModel` memoized selector | один массив данных для GPU layers |
 
 ```mermaid
 flowchart TD
     User["Operator"]
     Store["Zustand<br/>mode · floor · selection<br/>search · filters"]
     Query["TanStack Query<br/>floors · catalog · snapshot<br/>overview scenes"]
-    Workspace["OperatorWorkspace<br/>scope selection · telemetry index<br/>device filtering"]
+    Workspace["useOperatorWorkspaceModel<br/>scope selection · telemetry index<br/>device filtering"]
     FloorCamera["Floor renderer state<br/>target · zoom · viewport"]
     BuildingCamera["Building renderer state<br/>target · zoom · layout"]
     Floor["FloorScene"]
@@ -116,7 +118,7 @@ flowchart TD
 
 ### Точки взаимодействия TanStack Query и Zustand
 
-Библиотеки не обращаются друг к другу напрямую и не дублируют состояние. Их связывают `App` и `OperatorWorkspace`: Zustand определяет пользовательский scope и локальные преобразования, а TanStack Query возвращает соответствующие серверные документы.
+Библиотеки не обращаются друг к другу напрямую и не дублируют состояние. Их связывают `App` и `useOperatorWorkspaceModel`: Zustand определяет пользовательский scope и локальные преобразования, а TanStack Query возвращает соответствующие серверные документы. `OperatorWorkspace` после рефакторинга только компонует toolbar и нужный renderer по готовой view model.
 
 ```text
 OperatorToolbar event
@@ -140,13 +142,15 @@ Zustand: viewMode / selectedFloorId / filters / selectedDeviceId
 | Место | Данные TanStack Query | Состояние Zustand | Результат взаимодействия |
 |---|---|---|---|
 | `App.tsx` | `floorsQuery.data` | `viewMode`, `selectedFloorId` | выбранный этаж и заголовок приложения |
-| `OperatorWorkspace.tsx`, scope | загруженный список `floors` | `viewMode`, `selectedFloorId` | `floorIds` для catalog/snapshot query keys; смена ключа выбирает кеш нужного scope или запускает запрос |
-| `OperatorWorkspace.tsx`, initialization | первый элемент `floors` | `setSelectedFloorId` | первый загруженный этаж становится выбранным, если выбор ещё не сделан |
-| `OperatorWorkspace.tsx`, filtering | `catalogQuery.data.devices`, `snapshotQuery.data.telemetry` | `search`, type/protocol/status filters | единый `filteredDevices` для counters, layers, labels и picking; изменение фильтра не делает сетевой запрос |
-| `OperatorWorkspace.tsx`, selection | `catalogQuery.data.devices` | `selectedDeviceId` | поиск полного `selectedDevice`; canvas click записывает ID через `setSelectedDeviceId` |
-| `OperatorWorkspace.tsx`, composition | query `isLoading`/`error`/`data` | `viewMode` | loading/error UI и выбор `FloorScene` либо `BuildingOverview` |
+| `use-operator-workspace.ts`, scope | загруженный список `floors` | `viewMode`, `selectedFloorId` | `floorIds` для catalog/snapshot query keys; смена ключа выбирает кеш нужного scope или запускает запрос |
+| `use-operator-workspace.ts`, initialization | первый элемент `floors` | `setSelectedFloorId` | первый загруженный этаж становится выбранным, если выбор ещё не сделан |
+| `use-operator-workspace.ts`, filtering | `catalogQuery.data.devices`, `snapshotQuery.data.telemetry` | `search`, type/protocol/status filters | единый `filteredDevices` для counters, layers, labels и picking; изменение фильтра не делает сетевой запрос |
+| `use-operator-workspace.ts`, selection | `catalogQuery.data.devices` | `selectedDeviceId` | поиск полного `selectedDevice`; canvas click записывает ID через `setSelectedDeviceId` |
+| `OperatorWorkspace.tsx`, composition | готовые `isLoading`/`requestError`/data из view model | `viewMode` внутри view model | loading/error UI и выбор `FloorScene` либо `BuildingOverview` |
 
 Query keys находятся в `operator-queries.ts`: `['device-catalog', scope]` и `['state-snapshot', scope]`, где scope — ID этажа или `building`. Search и filters намеренно не входят в query key, потому что это локальные UI-преобразования уже загруженного документа. `selectedDeviceId` также хранится только в Zustand: в серверный кеш попадает устройство, но не пользовательский выбор.
+
+Чистое правило фильтрации находится в `operator-devices.ts`. Хук передаёт ему catalog, telemetry index и текущие Zustand filters, поэтому комбинации search/type/protocol/status тестируются отдельно от React Query и store lifecycle.
 
 На следующих этапах этот раздел обновляется при любом изменении query keys, cache/stale policy, состава Zustand store, правил scope, client-side filtering/selection или при переносе telemetry из snapshot query в realtime hot state.
 
@@ -154,6 +158,9 @@ Query keys находятся в `operator-queries.ts`: `['device-catalog', scop
 
 ### FloorScene
 
+- `FloorScene` — тонкая JSX-композиция без загрузки данных и конструирования deck.gl layers в render body;
+- `useFloorScene` владеет камерой, auto-fit, debounced/abortable scene query и GPU picking;
+- `useFloorSceneLayers` вычисляет LOD labels, делит features по geometry type и создаёт architecture/device layers;
 - fit вычисляется из bounds выбранного этажа;
 - архитектура запрашивается по реальному bbox камеры;
 - отфильтрованные устройства передаются в два instanced `IconLayer`;
@@ -196,6 +203,8 @@ flowchart TB
 
 Порядок слоёв существенен: warning/critical `IconLayer` идёт после обычного device layer, поэтому при визуальном пересечении приоритетные состояния остаются сверху.
 
+Общие для двух renderer правила вынесены из компонентов: `device-layers.ts` индексирует status, делит normal/priority instances и создаёт одинаково настроенный `IconLayer`, а `SceneControls` реализует единые zoom/fit controls. Поэтому floor и overview не расходятся по цветам, размерам, picking-настройкам и шагу zoom.
+
 ## Zoom и LOD
 
 `viewState.zoom` управляет камерой и одновременно влияет на четыре подсистемы:
@@ -227,6 +236,8 @@ Architecture bands:
 - обычные подписи появляются только при zoom `>= 5.2`, только внутри viewport и максимум 180 одновременно;
 - архитектурные подписи продолжают регулироваться scene LOD.
 
+Пороги, лимит и device layer IDs централизованы в `floor-scene-config.ts`; чистая функция `selectFloorDeviceLabels` в `floor-scene-labels.ts` реализует выбор подписей. Хук слоёв отвечает только за memoization и передачу результата в `TextLayer`.
+
 ## Search и filters
 
 Поиск case-insensitive по `device.name` и `device.id`. Type и protocol сравниваются со stable catalog; status — с отдельным telemetry map. Фильтры применяются до передачи данных в deck.gl, поэтому counters, status overlay, labels и picking работают с одним и тем же видимым набором.
@@ -242,17 +253,31 @@ Architecture bands:
 | Файл | Ответственность |
 |---|---|
 | `src/client/src/App.tsx` | shell, floors query, заголовок режима |
-| `src/client/src/OperatorWorkspace.tsx` | scope queries, telemetry index, filters, composition |
+| `src/client/src/OperatorWorkspace.tsx` | декларативная композиция toolbar и выбранного renderer |
+| `src/client/src/use-operator-workspace.ts` | query scope, telemetry index, filters, selection view model |
+| `src/client/src/operator-devices.ts` | чистая фильтрация catalog по search/type/protocol/status |
 | `src/client/src/operator-store.ts` | UI state на Zustand |
 | `src/client/src/operator-api.ts` | catalog и snapshot clients + Zod parse |
 | `src/client/src/operator-queries.ts` | React Query keys/cache policy |
 | `src/client/src/OperatorToolbar.tsx` | mode/floor/search/filter controls |
-| `src/client/src/FloorScene.tsx` | viewport scene, floor layers, camera, picking |
+| `src/client/src/FloorScene.tsx` | декларативная композиция floor renderer и overlays |
+| `src/client/src/use-floor-scene.ts` | camera, fit, scene request lifecycle и GPU picking |
+| `src/client/src/use-floor-scene-layers.ts` | floor architecture/device layers и label LOD |
+| `src/client/src/floor-scene-config.ts` | layer IDs, debounce и label LOD thresholds/limit |
+| `src/client/src/floor-scene-labels.ts` | чистый выбор device labels для текущих zoom и viewport |
 | `src/client/src/BuildingOverview.tsx` | layout и rendering всех этажей |
 | `src/client/src/DeviceCard.tsx` | selected device metadata + snapshot |
+| `src/client/src/SceneControls.tsx` | общие zoom/fit controls двух renderer |
+| `src/client/src/device-layers.ts` | общие status partition и фабрика device `IconLayer` |
 | `src/client/src/device-visuals.ts` | atlas mapping, status colors, icon LOD |
 | `src/client/src/scene-visuals.ts` | scene colors и zoom bands |
 | `src/client/src/viewport.ts` | floor/building fit и bbox conversion |
+
+## Тестовые границы
+
+- Чистые unit-тесты фиксируют status partition, поиск и комбинации filters, label zoom thresholds, viewport culling, deduplication и лимит 180.
+- Hook-тест `useFloorScene` с fake timers фиксирует 100 мс debounce, bbox/zoom request и abort устаревшего запроса при смене камеры.
+- Chromium E2E проверяет связанный пользовательский поток: floor switch, filters, overview, zoom и GPU picking.
 
 ## Ограничения и следующий шаг
 
