@@ -52,6 +52,7 @@ export const FloorSummarySchema = z.object({
   name: z.string(),
   elevation: z.number(),
   bounds: BBoxSchema,
+  order: z.number().int().positive().optional(),
 });
 
 export const SceneSourceSchema = z.object({

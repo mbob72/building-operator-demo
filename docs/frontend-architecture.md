@@ -1,263 +1,265 @@
 # Frontend architecture
 
-- Актуально на: 2026-08-08
-- Текущий этап: Stage 3, готов к приёмке
-- Назначение: живое описание реализованного фронтенда; документ обновляется при завершении каждого этапа и при существенном изменении frontend data flow.
+- Актуально на: 2026-08-09
+- Текущий этап: Stage 4, реализован, ожидает приёмки
+- Назначение: живое описание реализованного frontend; обновляется при каждом этапе и существенном изменении data flow.
 
-## Текущий пользовательский результат
+## Пользовательский результат
 
-Frontend показывает подготовленный план Level 1 West Riverside Hospital и 2 900 устройств этого этажа. Пользователь может перемещать и масштабировать план, выбирать устройство через GPU picking и открывать одну React-карточку с его стабильными метаданными.
+Frontend поддерживает два режима:
 
-Сейчас реализованы:
+- `Floor` — один из восьми этажей West Riverside Hospital;
+- `Building` — восемь небольших планов рядом и все 18 000 устройств.
 
-- orthographic deck.gl scene;
-- pan, wheel/touch zoom и fit;
-- серверная фильтрация архитектурной геометрии по viewport и zoom;
-- отдельная загрузка stable device metadata по этажу;
-- один instanced `IconLayer` для устройств;
-- SVG texture atlas из восьми визуальных категорий;
-- GPU picking и карточка выбранного устройства;
-- runtime-валидация API-ответов через Zod;
-- адаптация основных overlay-элементов для мобильной ширины.
+В обоих режимах работают pan, wheel/touch zoom, fit, GPU picking и одна карточка выбранного устройства. Панель оператора переключает этажи, ищет по имени/ID и фильтрует по типу, протоколу и operational status.
 
 ## Компонентная схема
 
 ```text
-App
- ├── GET /api/floors
- └── FloorScene
-      ├── POST /api/scene/query
-      │    └── архитектурная геометрия по viewport + zoom
-      ├── GET /api/v1/catalog
-      │    └── stable device metadata выбранного этажа
-      ├── DeckGL / OrthographicView
-      │    ├── PolygonLayer — архитектурные полигоны
-      │    ├── PathLayer    — стены, двери, окна и линии
-      │    ├── TextLayer    — подписи сцены
-      │    └── IconLayer    — устройства
-      └── React overlays
-           ├── zoom / fit controls
-           ├── diagnostics status
-           └── одна карточка выбранного устройства
+QueryClientProvider
+└── App
+    ├── useQuery(GET /api/floors)
+    └── OperatorWorkspace
+        ├── Zustand: mode, floor, selection, search, filters
+        ├── useQuery(GET /api/v1/catalog)
+        ├── useQuery(GET /api/v1/state/snapshot)
+        ├── OperatorToolbar
+        └── FloorScene | BuildingOverview
+            ├── architecture layers
+            │   ├── PolygonLayer
+            │   ├── PathLayer
+            │   └── TextLayer
+            ├── device layers
+            │   ├── IconLayer: normal/offline devices
+            │   ├── IconLayer: warning/critical devices, rendered last
+            │   └── TextLayer: selected/LOD labels
+            └── React overlays
+                ├── zoom / fit
+                ├── diagnostics
+                └── one DeviceCard
 ```
 
-## Граница между сценой и устройствами
+## Три независимых потока данных
 
-Архитектурная сцена и устройства — два независимых набора данных. Устройства не извлекаются из ответа `/api/scene/query`.
-
-### Простая ментальная модель слоёв
+Frontend не мержит сцену и устройства в единый transport document:
 
 ```text
-Архитектурная сцена
-├── PolygonLayer — полигоны и области
-├── PathLayer    — стены, двери, окна и другие линии
-└── TextLayer    — подписи
-
-Устройства
-└── IconLayer    — кликабельные иконки оборудования
+POST /api/scene/query   -> scene.features       -> plan layers
+GET  /api/v1/catalog    -> DeviceMetadata[]     -> device positions/icons
+GET  /api/v1/state/...  -> DeviceTelemetry[]    -> color/status/card values
 ```
 
-Первые три слоя строятся из `scene.features`, образуют архитектурную подложку и сейчас не участвуют в picking. `IconLayer` строится отдельно из `catalog.devices`, отображает устройства и является единственным кликабельным слоем текущего этапа.
+Связи выполняются по `floorId` и `deviceId`. Сцена и устройства визуально совпадают благодаря общей floor-local системе координат, а не потому, что устройства находятся в scene response.
 
-Название компонента `FloorScene` означает всю визуальную композицию этажа, а не один API-ответ: внутри него архитектурная сцена и device-слой совмещаются визуально, но остаются раздельными наборами данных.
+### Архитектурная сцена
 
-### Scene response
+`SceneFeature` содержит только `floor-shell`, `zone`, `wall`, `column`, `door`, `window`, `stair` и `label`. В floor mode запрос зависит от viewport и zoom, выполняется с debounce 100 мс, а предыдущий запрос отменяется. В building overview React Query получает по одной полной floor-local сцене на этаж для текущего zoom band и повторно использует кеш между переключениями.
 
-`POST /api/scene/query` возвращает:
+### Stable device catalog
 
-- описание этажа;
-- источник архитектурной IFC-модели;
-- `zoomBand`;
-- viewport/zoom-filtered массив `SceneFeature`;
-- количество полных и возвращённых архитектурных объектов.
+`DeviceMetadata` содержит имя, тип, протокол, floor-local позицию, provenance, binding и capabilities. Status намеренно отсутствует. React Query кеширует floor-scoped или building-scoped ответ 5 минут; pan/zoom не перезапрашивает каталог.
 
-Допустимые `SceneFeature.kind`: `floor-shell`, `zone`, `wall`, `column`, `door`, `window`, `stair`, `label`. Device kind в scene-контракте отсутствует.
+### Stage 4 status snapshot
 
-Запрос повторяется после pan/zoom с debounce 100 мс. Предыдущий запрос отменяется через `AbortController`.
+`DeviceTelemetry` загружается отдельно тем же floor/building scope и индексируется один раз в `Map<deviceId, telemetry>`. Snapshot детерминированный и read-only: он позволяет закончить status rendering/filtering до появления WebSocket и hot store в Stage 5. Он не изменяет stable metadata.
 
-### Device catalog response
+```mermaid
+flowchart LR
+    Catalog["DeviceMetadata[]<br/>id · type · protocol<br/>floorId · position"]
+    Snapshot["DeviceTelemetry[]<br/>deviceId · status<br/>connection · values"]
+    Index["Map&lt;deviceId, telemetry&gt;"]
+    Filter["Search and filters"]
+    Layers["deck.gl IconLayers"]
+    Card["DeviceCard"]
 
-`GET /api/v1/catalog?buildingId=west-riverside&floorIds=<floorId>` возвращает:
-
-- версию каталога;
-- building/floor metadata;
-- стабильный массив `DeviceMetadata` выбранного этажа;
-- координаты `device.position.x/y`;
-- тип, протокол, происхождение и capabilities устройства.
-
-Сервер читает эти данные из `data/generated/west-riverside.devices-18000.json.gz`, а не из scene fixture. Для Level 1 возвращается 2 900 устройств. Ответ поддерживает `ETag`, `Cache-Control` и `304`.
-
-Каталог загружается один раз при выборе этажа и не запрашивается повторно при каждом pan/zoom.
-
-### Где они объединяются
-
-Два ответа не сливаются в общий массив. Они встречаются только в `FloorScene.layers`:
-
-```text
-scene.features -> PolygonLayer + PathLayer + TextLayer
-catalog.devices -> IconLayer
+    Snapshot --> Index
+    Catalog --> Filter
+    Index --> Filter
+    Filter --> Layers
+    Catalog --> Card
+    Index --> Card
 ```
 
-Все слои используют одну floor-local систему координат и одну `OrthographicView`, поэтому устройства визуально располагаются поверх архитектуры. Именно общая система координат может создавать впечатление, что устройства пришли из сцены.
+Диаграмма подчёркивает, что status не является полем `DeviceMetadata`: catalog и snapshot соединяются на frontend по `deviceId`.
 
 ## Владение состоянием
 
-### App
+| Состояние | Владелец | Причина |
+|---|---|---|
+| Floors, catalog, snapshot, overview scenes | TanStack Query | серверные документы, cache/dedup/stale policy |
+| Mode, selected floor/device, search, filters | Zustand `operator-store` | общее UI-состояние без prop drilling |
+| Camera `viewState`, текущая floor scene | `FloorScene` / `BuildingOverview` | локальное высокочастотное состояние renderer |
+| Indexed telemetry lookup | `OperatorWorkspace` memoized `Map` | O(1) соединение metadata и status |
+| Filtered device array | `OperatorWorkspace` memoized selector | один массив данных для GPU layers |
 
-`App` загружает список этажей, выбирает первый и передаёт его в `FloorScene`. Переключение этажей пока не реализовано.
+```mermaid
+flowchart TD
+    User["Operator"]
+    Store["Zustand<br/>mode · floor · selection<br/>search · filters"]
+    Query["TanStack Query<br/>floors · catalog · snapshot<br/>overview scenes"]
+    Workspace["OperatorWorkspace<br/>scope selection · telemetry index<br/>device filtering"]
+    FloorCamera["Floor renderer state<br/>target · zoom · viewport"]
+    BuildingCamera["Building renderer state<br/>target · zoom · layout"]
+    Floor["FloorScene"]
+    Overview["BuildingOverview"]
+
+    User --> Store
+    Store --> Workspace
+    Query --> Workspace
+    Workspace -->|floor mode| Floor
+    Workspace -->|building mode| Overview
+    FloorCamera --> Floor
+    BuildingCamera --> Overview
+```
+
+При смене scope catalog и snapshot запрашиваются согласованно. При смене этажа выбранное устройство сбрасывается. Filters меняют массив instances deck.gl, но не создают DOM-маркер на устройство.
+
+### Точки взаимодействия TanStack Query и Zustand
+
+Библиотеки не обращаются друг к другу напрямую и не дублируют состояние. Их связывают `App` и `OperatorWorkspace`: Zustand определяет пользовательский scope и локальные преобразования, а TanStack Query возвращает соответствующие серверные документы.
+
+```text
+OperatorToolbar event
+        │
+        ▼
+Zustand: viewMode / selectedFloorId / filters / selectedDeviceId
+        │
+        ├── viewMode + selectedFloorId -> floorIds -> TanStack queryKey
+        │                                      │
+        │                                      ▼
+        │                            catalog + snapshot data
+        │                                      │
+        ├── search/type/protocol/status filters┘
+        │                    │
+        │                    ▼
+        │             filteredDevices
+        │
+        └── selectedDeviceId + catalog data -> selectedDevice
+```
+
+| Место | Данные TanStack Query | Состояние Zustand | Результат взаимодействия |
+|---|---|---|---|
+| `App.tsx` | `floorsQuery.data` | `viewMode`, `selectedFloorId` | выбранный этаж и заголовок приложения |
+| `OperatorWorkspace.tsx`, scope | загруженный список `floors` | `viewMode`, `selectedFloorId` | `floorIds` для catalog/snapshot query keys; смена ключа выбирает кеш нужного scope или запускает запрос |
+| `OperatorWorkspace.tsx`, initialization | первый элемент `floors` | `setSelectedFloorId` | первый загруженный этаж становится выбранным, если выбор ещё не сделан |
+| `OperatorWorkspace.tsx`, filtering | `catalogQuery.data.devices`, `snapshotQuery.data.telemetry` | `search`, type/protocol/status filters | единый `filteredDevices` для counters, layers, labels и picking; изменение фильтра не делает сетевой запрос |
+| `OperatorWorkspace.tsx`, selection | `catalogQuery.data.devices` | `selectedDeviceId` | поиск полного `selectedDevice`; canvas click записывает ID через `setSelectedDeviceId` |
+| `OperatorWorkspace.tsx`, composition | query `isLoading`/`error`/`data` | `viewMode` | loading/error UI и выбор `FloorScene` либо `BuildingOverview` |
+
+Query keys находятся в `operator-queries.ts`: `['device-catalog', scope]` и `['state-snapshot', scope]`, где scope — ID этажа или `building`. Search и filters намеренно не входят в query key, потому что это локальные UI-преобразования уже загруженного документа. `selectedDeviceId` также хранится только в Zustand: в серверный кеш попадает устройство, но не пользовательский выбор.
+
+На следующих этапах этот раздел обновляется при любом изменении query keys, cache/stale policy, состава Zustand store, правил scope, client-side filtering/selection или при переносе telemetry из snapshot query в realtime hot state.
+
+## Floor и building rendering
 
 ### FloorScene
 
-Компонент хранит:
+- fit вычисляется из bounds выбранного этажа;
+- архитектура запрашивается по реальному bbox камеры;
+- отфильтрованные устройства передаются в два instanced `IconLayer`;
+- picking ограничен device layer IDs;
+- карточка показывается только для устройства текущего этажа.
 
-- `viewState` — target, zoom и ограничения камеры;
-- `scene` — текущую viewport/zoom-выборку архитектуры;
-- `devices` — stable metadata устройств этажа;
-- `selectedDevice` — выбранное устройство;
-- отдельные scene/device errors;
-- признак обновления scene request.
+### BuildingOverview
 
-Пока используются стандартные React `useState`, `useEffect`, `useMemo` и `useRef`. Query cache, Zustand и отдельный hot telemetry store ещё не подключены.
+- этажи раскладываются в сетку 4 колонки на desktop и 2 на mobile;
+- floor-local координаты временно смещаются на layout offset;
+- архитектура восьми этажей объединяется по типам в общие layers;
+- все 18 000 устройств остаются WebGL instances, а не React-компонентами;
+- fit охватывает общий layout; pan/zoom и picking используют одну `OrthographicView`.
 
-## Zoom data flow и влияние на UI
+### Композиция WebGL-слоёв
 
-`viewState.zoom` — общий источник масштаба для камеры, backend scene query, архитектурного LOD, размера device-иконок и diagnostics UI.
+```mermaid
+flowchart TB
+    SceneFeatures["scene.features"]
+    Devices["filtered devices"]
+    Telemetry["status by deviceId"]
 
-```text
-wheel / pinch / double click / + / − / Fit
-                    │
-                    ▼
-             viewState.zoom
-                    │
-       ┌────────────┼──────────────┐
-       │            │              │
-       ▼            ▼              ▼
-DeckGL camera   viewStateToBBox   IconLayer size
-                    │              7 / 10 / 14 px
-                    ▼
-          POST /api/scene/query
-             zoom + viewport
-                    │
-                    ▼
-       server zoom band + feature LOD
-                    │
-                    ▼
-  PolygonLayer / PathLayer / TextLayer data
+    SceneFeatures --> Polygons["PolygonLayer<br/>floor shell · zones"]
+    SceneFeatures --> Paths["PathLayer<br/>walls · doors · windows"]
+    SceneFeatures --> SceneLabels["TextLayer<br/>plan labels"]
 
-Diagnostics status показывает zoom, zoom band и число features.
+    Devices --> Normal["IconLayer<br/>normal · offline"]
+    Devices --> Priority["IconLayer<br/>warning · critical"]
+    Telemetry --> Normal
+    Telemetry --> Priority
+    Devices --> DeviceLabels["TextLayer<br/>selected and LOD labels"]
+
+    Polygons --> Composition["OrthographicView composition"]
+    Paths --> Composition
+    SceneLabels --> Composition
+    Normal --> Composition
+    Priority --> Composition
+    DeviceLabels --> Composition
 ```
 
-### Источники изменения zoom
+Порядок слоёв существенен: warning/critical `IconLayer` идёт после обычного device layer, поэтому при визуальном пересечении приоритетные состояния остаются сверху.
 
-- Wheel/trackpad, pinch и double click обрабатываются deck.gl controller.
-- Кнопки `+` и `−` изменяют zoom на `0.35` и ограничивают его `minZoom/maxZoom`.
-- `Fit` вычисляет zoom из размеров контейнера и bounds этажа: выбирается минимальный scale по ширине/высоте с коэффициентом поля `0.86`, затем применяется `Math.log2(scale)`.
-- Допустимый frontend-диапазон сейчас `-1..7`.
+## Zoom и LOD
 
-В `OrthographicView` scale равен `2 ** zoom`: увеличение zoom на `1` удваивает экранный размер одной мировой единицы.
-
-### Камера и viewport bbox
-
-DeckGL сразу использует zoom для визуального масштаба. Одновременно `viewStateToBBox()` переводит zoom и размеры canvas в видимую область мировых координат:
+`viewState.zoom` управляет камерой и одновременно влияет на четыре подсистемы:
 
 ```text
-scale      = 2 ** zoom
-halfWidth  = canvasWidth  / (2 * scale)
-halfHeight = canvasHeight / (2 * scale)
+user input / Fit
+       │
+       ▼
+ viewState.zoom
+   ├── camera scale = 2 ** zoom
+   ├── visible world bbox
+   ├── backend architecture LOD
+   ├── device icon size/status emphasis
+   └── device label policy
 ```
 
-При увеличении zoom bbox сужается, при уменьшении — расширяется. Поэтому backend получает не только значение zoom, но и новую видимую область.
+Architecture bands:
 
-### Архитектурный LOD
+- `overview`: zoom `< 1.7`;
+- `standard`: `1.7 <= zoom < 4.1`;
+- `detail`: zoom `>= 4.1`.
 
-После изменения zoom scene effect с debounce 100 мс вызывает `/api/scene/query`. Backend:
+Обычная device icon имеет размер 7/10/14 px по диапазонам zoom. Warning — 11/14/17 px, critical — 13/16/19 px. Warning/critical instances выделены в отдельный слой, рисуются поверх остальных и не исчезают из-за renderer LOD. Offline/normal остаются в основном слое.
 
-- оставляет features, пересекающие новый bbox;
-- оставляет features, для которых `minZoom <= zoom <= maxZoom`;
-- назначает `overview` при zoom `< 1.7`;
-- назначает `standard` при `1.7 <= zoom < 4.1`;
-- назначает `detail` при zoom `>= 4.1`.
+Подписи ограничены, чтобы не создать визуальный и CPU-шум:
 
-Новый `scene.features` меняет данные `PolygonLayer`, `PathLayer` и `TextLayer`. Поэтому при приближении могут появляться двери, окна, подписи и другая detail-геометрия, а diagnostics показывает другое число features.
+- выбранное устройство подписано всегда;
+- warning/critical в floor mode подписываются со среднего приближения;
+- обычные подписи появляются только при zoom `>= 5.2`, только внутри viewport и максимум 180 одновременно;
+- архитектурные подписи продолжают регулироваться scene LOD.
 
-### Размер device-иконок
+## Search и filters
 
-Zoom не вызывает повторную загрузку catalog и не меняет количество устройств. Все devices текущего этажа остаются в `IconLayer`, но их экранный размер меняется ступенчато:
+Поиск case-insensitive по `device.name` и `device.id`. Type и protocol сравниваются со stable catalog; status — с отдельным telemetry map. Фильтры применяются до передачи данных в deck.gl, поэтому counters, status overlay, labels и picking работают с одним и тем же видимым набором.
 
-- zoom `< 2.8` — 7 px;
-- `2.8 <= zoom < 4.1` — 10 px;
-- zoom `>= 4.1` — 14 px.
-
-Размер задаётся в `pixels`, поэтому внутри каждого диапазона иконка сохраняет постоянный экранный размер, хотя расстояние между устройствами растёт вместе с масштабом камеры. GPU picking, selected device, цвет и карточка не сбрасываются при zoom.
-
-### Diagnostics и loading state
-
-Status overlay выводит:
-
-- серверный `scene.zoomBand`;
-- returned/total feature count;
-- неизменное число загруженных devices;
-- `viewState.zoom` с двумя знаками;
-- `updating`, пока выполняется новый scene request.
-
-Быстрые последовательные изменения zoom отменяют устаревший scene request через `AbortController`. Catalog request от zoom не зависит.
-
-## WebGL rendering
-
-### Архитектурные слои
-
-- `PolygonLayer` отображает polygon features.
-- `PathLayer` отображает path features.
-- `TextLayer` отображает point labels.
-- Архитектурные слои сейчас `pickable: false`, так как для них нет пользовательского сценария выбора.
-
-### Device layer
-
-Все устройства этажа передаются в один `IconLayer<DeviceMetadata>`. Это instanced WebGL rendering: React не создаёт DOM/JSX-элемент и обработчик для каждого устройства.
-
-Типы устройств преобразуются в восемь atlas-категорий: `light`, `sensor`, `fire`, `hvac`, `control`, `access`, `meter`, `other`. Цвет задаётся категорией. Operational status пока отсутствует.
-
-Размер иконки зависит от zoom:
-
-- overview — 7 px;
-- standard — 10 px;
-- detail — 14 px.
+`Reset` очищает search/type/protocol/status, не меняя mode и выбранный этаж.
 
 ## Selection и GPU picking
 
-Клик по canvas вызывает `DeckGLRef.pickObject()`:
-
-- поиск ограничен `layerIds: ['floor-devices']`;
-- используется pick radius 4 px;
-- результатом является исходный `DeviceMetadata`;
-- выбранный instance подсвечивается;
-- React создаёт одну карточку выбранного устройства.
-
-Карточка показывает name, type, protocol, data origin, floor-local position, число telemetry channels, число command capabilities и ID.
+Клик по canvas вызывает `DeckGLRef.pickObject()` с radius 4 и только с device layer IDs. Возвращённый instance преобразуется в `deviceId`, который хранится в Zustand. React создаёт ровно одну `DeviceCard`; карточка соединяет stable metadata с текущим snapshot и показывает status, connection и до четырёх telemetry values.
 
 ## Основные frontend-файлы
 
 | Файл | Ответственность |
 |---|---|
-| `src/client/src/App.tsx` | Application shell и начальный этаж |
-| `src/client/src/FloorScene.tsx` | Запросы сцены/устройств, controlled view state, слои, picking, карточка |
-| `src/client/src/scene-api.ts` | Floors и viewport scene API client |
-| `src/client/src/device-api.ts` | Stable catalog API client |
-| `src/client/src/viewport.ts` | Fit и преобразование view state в bbox |
-| `src/client/src/use-element-size.ts` | Размер контейнера сцены |
-| `src/client/public/device-atlas.svg` | Texture atlas устройств |
-| `src/client/src/styles.css` | Shell, overlays, карточка и mobile styles |
-| `src/shared/scene-contracts.ts` | Scene runtime contracts |
-| `src/shared/domain-contracts.ts` | Device metadata runtime contracts |
+| `src/client/src/App.tsx` | shell, floors query, заголовок режима |
+| `src/client/src/OperatorWorkspace.tsx` | scope queries, telemetry index, filters, composition |
+| `src/client/src/operator-store.ts` | UI state на Zustand |
+| `src/client/src/operator-api.ts` | catalog и snapshot clients + Zod parse |
+| `src/client/src/operator-queries.ts` | React Query keys/cache policy |
+| `src/client/src/OperatorToolbar.tsx` | mode/floor/search/filter controls |
+| `src/client/src/FloorScene.tsx` | viewport scene, floor layers, camera, picking |
+| `src/client/src/BuildingOverview.tsx` | layout и rendering всех этажей |
+| `src/client/src/DeviceCard.tsx` | selected device metadata + snapshot |
+| `src/client/src/device-visuals.ts` | atlas mapping, status colors, icon LOD |
+| `src/client/src/scene-visuals.ts` | scene colors и zoom bands |
+| `src/client/src/viewport.ts` | floor/building fit и bbox conversion |
 
-## Текущие ограничения и следующий архитектурный шаг
+## Ограничения и следующий шаг
 
-- Показывается только первый этаж.
-- Нет building overview, поиска и фильтров.
-- Все устройства этажа загружаются целиком; device viewport culling пока не нужен и не реализован.
-- Цвет отражает категорию, а не telemetry/alarm status.
-- Realtime, hot store и dirty GPU attribute updates не реализованы.
-- Level 1 catalog response содержит полные stable metadata и занимает около 2,18 МБ до HTTP content encoding.
-- `FloorScene` пока совмещает data loading, layer construction и overlays. Перед дальнейшим ростом его следует разделить на hooks/data adapters, layer factory и самостоятельные UI-компоненты.
+- Snapshot статичен; realtime, reconnect, resync и event batching относятся к Stage 5.
+- Telemetry пока хранится в memoized `Map`, а не в специализированном внешнем hot store.
+- Catalog и snapshot целиком передаются для выбранного scope; device spatial culling/clustering не добавлялись без benchmark.
+- Overview делает до восьми scene queries на новый zoom band; ответы кешируются, но пока не объединены в отдельный backend batch endpoint.
+- Главный JS chunk около 1 МБ minified из-за deck.gl; code splitting оставлен как измеряемая оптимизация, а не блокер MVP.
 
-Stage 4 добавит переключение этажей, building overview, поиск/фильтры и дальнейший LOD. Stage 5 добавит realtime transport и отдельное индексированное hot state, не смешивая его со stable catalog.
+Stage 5 должен заменить статический snapshot на authoritative snapshot + ordered realtime transport и индексированный hot state, сохранив stable catalog и renderer state раздельными.

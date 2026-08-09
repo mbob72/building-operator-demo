@@ -1,11 +1,13 @@
 import Fastify from 'fastify';
+import fastifyCompress from '@fastify/compress';
 import fastifyStatic from '@fastify/static';
 import { createHash } from 'node:crypto';
 import { resolve } from 'node:path';
-import { CatalogQuerySchema } from '../shared/api-contracts.js';
+import { CatalogQuerySchema, StateSnapshotQuerySchema } from '../shared/api-contracts.js';
 import { SceneQuerySchema, type BBox, type SceneFeature } from '../shared/scene-contracts.js';
 import { deviceCatalog, selectCatalogFloors } from './device-catalog.js';
-import { floor, sceneFeatures, source } from './scene-fixture.js';
+import { findScene, floors, sceneDatasetVersion } from './scene-repository.js';
+import { selectSnapshotFloors } from './state-snapshot.js';
 
 interface AppOptions {
   serveStatic?: boolean;
@@ -26,10 +28,11 @@ const zoomBand = (zoom: number) => {
 
 export const buildApp = (options: AppOptions = {}) => {
   const app = Fastify({ logger: false });
+  app.register(fastifyCompress, { global: true, threshold: 1_024 });
 
   app.get('/api/health', async () => ({ status: 'ok' }));
 
-  app.get('/api/floors', async () => ({ floors: [floor] }));
+  app.get('/api/floors', async () => ({ floors }));
 
   app.get('/api/v1/catalog', async (request, reply) => {
     const raw = request.query as { buildingId?: unknown; floorIds?: unknown };
@@ -60,6 +63,34 @@ export const buildApp = (options: AppOptions = {}) => {
     return selectCatalogFloors(floorIds);
   });
 
+  app.get('/api/v1/state/snapshot', async (request, reply) => {
+    const raw = request.query as { buildingId?: unknown; floorIds?: unknown };
+    const parsed = StateSnapshotQuerySchema.safeParse({
+      buildingId: raw.buildingId,
+      floorIds: typeof raw.floorIds === 'string' ? [raw.floorIds] : raw.floorIds,
+    });
+    if (!parsed.success) {
+      return reply.status(400).send({
+        error: 'invalid_snapshot_query',
+        details: parsed.error.issues,
+      });
+    }
+    if (parsed.data.buildingId !== deviceCatalog.building.id) {
+      return reply.status(404).send({ error: 'building_not_found' });
+    }
+    const floorIds = parsed.data.floorIds ?? floors.map((item) => item.id);
+    if (floorIds.some((floorId) => !floors.some((item) => item.id === floorId))) {
+      return reply.status(404).send({ error: 'floor_not_found' });
+    }
+    const etag = `"${createHash('sha256')
+      .update(`stage-4-static-snapshot-v1:${floorIds.join(',')}`)
+      .digest('base64url')}"`;
+    reply.header('etag', etag);
+    reply.header('cache-control', 'public, max-age=300, stale-while-revalidate=60');
+    if (request.headers['if-none-match'] === etag) return reply.status(304).send();
+    return selectSnapshotFloors(floorIds);
+  });
+
   app.post('/api/scene/query', async (request, reply) => {
     const parsed = SceneQuerySchema.safeParse(request.body);
     if (!parsed.success) {
@@ -69,24 +100,25 @@ export const buildApp = (options: AppOptions = {}) => {
       });
     }
 
-    if (parsed.data.floorId !== floor.id) {
+    const record = findScene(parsed.data.floorId);
+    if (!record) {
       return reply.status(404).send({ error: 'floor_not_found' });
     }
 
-    const features = sceneFeatures.filter(
+    const features = record.scene.features.filter(
       (feature) => intersects(feature.bbox, parsed.data.viewport.bbox)
         && isVisibleAtZoom(feature, parsed.data.zoom),
     );
 
     return {
-      sceneVersion: 'west-riverside-level-1-v1',
-      source,
-      floor,
+      sceneVersion: `${sceneDatasetVersion}:${record.floor.id}`,
+      source: record.scene.source,
+      floor: record.floor,
       request: parsed.data,
       zoomBand: zoomBand(parsed.data.zoom),
       features,
       meta: {
-        totalFeatures: sceneFeatures.length,
+        totalFeatures: record.scene.features.length,
         returnedFeatures: features.length,
       },
     };

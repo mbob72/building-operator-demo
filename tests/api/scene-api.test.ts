@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { CatalogResponseSchema } from '../../src/shared/api-contracts';
-import { SceneResponseSchema } from '../../src/shared/scene-contracts';
+import { CatalogResponseSchema, StateSnapshotSchema } from '../../src/shared/api-contracts';
+import { FloorSummarySchema, SceneResponseSchema } from '../../src/shared/scene-contracts';
 import { buildApp } from '../../src/server/app';
 
 const apps: ReturnType<typeof buildApp>[] = [];
@@ -15,6 +15,17 @@ afterEach(async () => {
 });
 
 describe('scene API', () => {
+  it('lists all eight prepared floors in display order', async () => {
+    const response = await createApp().inject({ method: 'GET', url: '/api/floors' });
+
+    expect(response.statusCode).toBe(200);
+    const floors = FloorSummarySchema.array().parse(response.json().floors);
+    expect(floors).toHaveLength(8);
+    expect(floors.map((floor) => floor.order)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+    expect(floors.at(-1)?.id).toBe('west-riverside-level-7');
+    expect(floors.at(-2)?.id).toBe('west-riverside-level-7a');
+  });
+
   it('returns a contract-valid floor scene', async () => {
     const response = await createApp().inject({
       method: 'POST',
@@ -66,6 +77,24 @@ describe('scene API', () => {
     const detail = await app.inject({ method: 'POST', url: '/api/scene/query', payload: { ...payload, zoom: 5 } });
 
     expect(detail.json().meta.returnedFeatures).toBeGreaterThan(overview.json().meta.returnedFeatures);
+  });
+
+  it('serves prepared geometry for a floor other than Level 1', async () => {
+    const response = await createApp().inject({
+      method: 'POST',
+      url: '/api/scene/query',
+      payload: {
+        floorId: 'west-riverside-level-7a',
+        viewport: { bbox: [0, 0, 100, 100], width: 800, height: 600 },
+        zoom: 5,
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const scene = SceneResponseSchema.parse(response.json());
+    expect(scene.floor.id).toBe('west-riverside-level-7a');
+    expect(scene.sceneVersion).toBe('west-riverside-stage-2-v1:west-riverside-level-7a');
+    expect(scene.features.length).toBeGreaterThan(0);
   });
 
   it('rejects invalid queries and unknown floors', async () => {
@@ -121,6 +150,67 @@ describe('device catalog API', () => {
     });
 
     expect(invalid.statusCode).toBe(400);
+    expect(missing.statusCode).toBe(404);
+  });
+
+  it('combines repeated floor scopes without mixing status into metadata', async () => {
+    const response = await createApp().inject({
+      method: 'GET',
+      url: '/api/v1/catalog?buildingId=west-riverside&floorIds=west-riverside-level-1&floorIds=west-riverside-level-7',
+    });
+
+    expect(response.statusCode).toBe(200);
+    const catalog = CatalogResponseSchema.parse(response.json());
+    expect(catalog.totalDevices).toBe(3_050);
+    expect(new Set(catalog.devices.map((device) => device.floorId))).toEqual(new Set([
+      'west-riverside-level-1',
+      'west-riverside-level-7',
+    ]));
+    expect(catalog.devices.every((device) => !('status' in device))).toBe(true);
+  });
+});
+
+describe('status snapshot API', () => {
+  it('returns a deterministic status record for every scoped device', async () => {
+    const app = createApp();
+    const url = '/api/v1/state/snapshot?buildingId=west-riverside&floorIds=west-riverside-level-1';
+    const response = await app.inject({ method: 'GET', url });
+
+    expect(response.statusCode).toBe(200);
+    const snapshot = StateSnapshotSchema.parse(response.json());
+    expect(snapshot.telemetry).toHaveLength(2_900);
+    expect(snapshot.sequence).toBe(0);
+    expect(snapshot.telemetry.some((item) => item.status === 'warning')).toBe(true);
+    expect(snapshot.telemetry.some((item) => item.status === 'critical')).toBe(true);
+    expect(snapshot.telemetry.every((item) => (
+      item.connection !== 'offline' || item.status === 'offline'
+    ))).toBe(true);
+    expect(response.headers.etag).toMatch(/^".+"$/);
+
+    const repeated = StateSnapshotSchema.parse((await app.inject({ method: 'GET', url })).json());
+    expect(repeated).toEqual(snapshot);
+
+    const cached = await app.inject({
+      method: 'GET',
+      url,
+      headers: { 'if-none-match': response.headers.etag },
+    });
+    expect(cached.statusCode).toBe(304);
+  });
+
+  it('returns the full 18,000-device building snapshot and validates scope errors', async () => {
+    const app = createApp();
+    const full = await app.inject({
+      method: 'GET',
+      url: '/api/v1/state/snapshot?buildingId=west-riverside',
+    });
+    const missing = await app.inject({
+      method: 'GET',
+      url: '/api/v1/state/snapshot?buildingId=west-riverside&floorIds=missing',
+    });
+
+    expect(full.statusCode).toBe(200);
+    expect(StateSnapshotSchema.parse(full.json()).telemetry).toHaveLength(18_000);
     expect(missing.statusCode).toBe(404);
   });
 });

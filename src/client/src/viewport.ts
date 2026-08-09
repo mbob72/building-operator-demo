@@ -31,3 +31,10 @@ export const fitFloor = (floor: FloorSummary, width: number, height: number): Sc
     maxZoom: 7,
   };
 };
+
+export const fitBounds = (bounds: BBox, width: number, height: number): SceneViewState => fitFloor({
+  id: 'view-bounds',
+  name: 'View bounds',
+  elevation: 0,
+  bounds,
+}, width, height);

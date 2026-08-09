@@ -337,8 +337,12 @@ export const CommandRecordSchema = z.object({
 
 export type BuildingMetadata = z.infer<typeof BuildingMetadataSchema>;
 export type FloorMetadata = z.infer<typeof FloorMetadataSchema>;
+export type DeviceProtocol = z.infer<typeof DeviceProtocolSchema>;
+export type DeviceType = z.infer<typeof DeviceTypeSchema>;
 export type DeviceMetadata = z.infer<typeof DeviceMetadataSchema>;
 export type DeviceCatalog = z.infer<typeof DeviceCatalogSchema>;
+export type TelemetryScalar = z.infer<typeof TelemetryScalarSchema>;
+export type DeviceStatus = z.infer<typeof DeviceStatusSchema>;
 export type DeviceTelemetry = z.infer<typeof DeviceTelemetrySchema>;
 export type DeviceTelemetryPatch = z.infer<typeof DeviceTelemetryPatchSchema>;
 export type Alarm = z.infer<typeof AlarmSchema>;

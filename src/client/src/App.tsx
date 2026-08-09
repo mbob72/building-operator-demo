@@ -1,47 +1,49 @@
-import { useEffect, useState } from 'react';
-import type { FloorSummary } from '../../shared/scene-contracts';
-import { FloorScene } from './FloorScene';
+import { useQuery } from '@tanstack/react-query';
+import { OperatorWorkspace } from './OperatorWorkspace';
+import { useOperatorStore } from './operator-store';
 import { loadFloors } from './scene-api';
 
 export const App = () => {
-  const [floor, setFloor] = useState<FloorSummary>();
-  const [error, setError] = useState<string>();
-
-  useEffect(() => {
-    const controller = new AbortController();
-    loadFloors(controller.signal)
-      .then(([firstFloor]) => {
-        if (!firstFloor) throw new Error('Scene API returned no floors');
-        setFloor(firstFloor);
-      })
-      .catch((requestError) => {
-        if (!(requestError instanceof DOMException && requestError.name === 'AbortError')) {
-          setError(requestError instanceof Error ? requestError.message : 'Unknown floor error');
-        }
-      });
-    return () => controller.abort();
-  }, []);
+  const floorsQuery = useQuery({
+    queryKey: ['floors'],
+    queryFn: ({ signal }) => loadFloors(signal),
+    staleTime: 5 * 60_000,
+  });
+  const viewMode = useOperatorStore((state) => state.viewMode);
+  const selectedFloorId = useOperatorStore((state) => state.selectedFloorId);
+  const selectedFloor = floorsQuery.data?.find((floor) => floor.id === selectedFloorId)
+    ?? floorsQuery.data?.[0];
+  const title = viewMode === 'overview'
+    ? 'West Riverside · Building overview'
+    : selectedFloor?.name ?? 'Loading floor…';
 
   return (
     <main className="app-shell">
       <header className="topbar">
         <div>
-          <p className="eyebrow">OPERATOR SCENE / STAGE 3</p>
-          <h1>{floor?.name ?? 'Loading floor…'}</h1>
+          <p className="eyebrow">OPERATOR SCENE / STAGE 4</p>
+          <h1>{title}</h1>
         </div>
         <div className="topbar__meta">
-          <span>VIEWPORT API</span>
-          <span>REAL IFC FLOOR</span>
-          <span>GPU DEVICE LAYER</span>
+          <span>8 FLOORS</span>
+          <span>18K DEVICES</span>
+          <span>STATUS LOD</span>
         </div>
       </header>
       <section className="workspace">
-        {error && <div className="fatal-error">{error}</div>}
-        {floor && <FloorScene floor={floor} />}
+        {floorsQuery.error && (
+          <div className="fatal-error">
+            {floorsQuery.error instanceof Error ? floorsQuery.error.message : 'Unknown floor error'}
+          </div>
+        )}
+        {floorsQuery.isLoading && <div className="workspace-state">Loading building…</div>}
+        {floorsQuery.data && floorsQuery.data.length > 0 && (
+          <OperatorWorkspace floors={floorsQuery.data} />
+        )}
       </section>
       <footer className="footer">
-        <span>Drag to pan · wheel or controls to zoom</span>
-        <span>Floor geometry and stable device metadata are separate layers</span>
+        <span>Drag to pan · wheel or controls to zoom · click a device for details</span>
+        <span>Geometry · stable catalog · status snapshot are independent data flows</span>
       </footer>
     </main>
   );

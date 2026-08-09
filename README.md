@@ -1,6 +1,6 @@
 # Building operator MVP
 
-Stage 0 proves a viewport-aware scene delivery contract and browser viewer for real West Riverside Hospital geometry. Stage 1 defines the product model and backend-independent operational contracts. Stage 2 adds a reproducible offline pipeline for eight architectural floors, a representative 18,000-device catalog, and a separate 50,000-device stress fixture. Stage 3 renders 2,900 Level 1 devices with an instanced deck.gl `IconLayer`, texture atlas, GPU picking, and a single selected-device card.
+Stage 0 proves viewport-aware scene delivery for real West Riverside Hospital geometry. Stage 1 defines product and operational contracts. Stage 2 adds eight architectural floors, a representative 18,000-device catalog, and a 50,000-device stress fixture. Stage 3 renders a one-floor device slice. Stage 4 adds floor switching, an eight-floor building overview, search/status filters, renderer LOD, and a separate deterministic status snapshot.
 
 ## Run
 
@@ -27,7 +27,7 @@ npm run contracts:generate
 npm run contracts:check
 ```
 
-See [`docs/product.md`](docs/product.md), [`docs/architecture.md`](docs/architecture.md), [`docs/frontend-architecture.md`](docs/frontend-architecture.md), [`docs/backend-architecture.md`](docs/backend-architecture.md), [`reports/stage-one.md`](reports/stage-one.md), [`reports/data-quality.md`](reports/data-quality.md), and [`reports/stage-three.md`](reports/stage-three.md).
+See [`docs/product.md`](docs/product.md), [`docs/architecture.md`](docs/architecture.md), [`docs/architecture-todo.md`](docs/architecture-todo.md), [`docs/frontend-architecture.md`](docs/frontend-architecture.md), [`docs/backend-architecture.md`](docs/backend-architecture.md), [`reports/stage-one.md`](reports/stage-one.md), [`reports/data-quality.md`](reports/data-quality.md), [`reports/stage-three.md`](reports/stage-three.md), and [`reports/stage-four.md`](reports/stage-four.md).
 
 ## Production mode
 

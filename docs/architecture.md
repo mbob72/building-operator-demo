@@ -1,21 +1,59 @@
 # Architecture
 
+Незакрытые межэтапные архитектурные риски и критерии их закрытия ведутся отдельно в [`architecture-todo.md`](architecture-todo.md).
+
 ## System boundaries
 
-```text
-Offline IFC/data pipeline
-        -> prepared plan geometry + stable device catalog
+```mermaid
+flowchart LR
+    subgraph Offline["Offline data pipeline"]
+        IFC["IFC models"]
+        Pipeline["Extraction and generation"]
+        Scenes["8 prepared floor scenes"]
+        CatalogFile["18k device catalog"]
 
-React application shell
-        -> query cache for catalog and other stable server documents
-        -> Zustand UI state for view, filters, selection, and command drafts
-        -> indexed hot store for telemetry, alarms, commands, and stream cursor
-        -> deck.gl rendering adapter for stable positions + dirty visual attributes
+        IFC --> Pipeline
+        Pipeline --> Scenes
+        Pipeline --> CatalogFile
+    end
 
-Unified backend boundary
-        -> REST catalog, snapshot, acknowledge, and command endpoints
-        -> WebSocket ordered event stream
-        -> mock simulator now; replaceable production backend later
+    subgraph Backend["Fastify backend"]
+        SceneRepo["Scene repository"]
+        CatalogRepo["Device catalog"]
+        Snapshot["Stage 4 status snapshot"]
+        FloorsAPI["GET /api/floors"]
+        SceneAPI["POST /api/scene/query"]
+        CatalogAPI["GET /api/v1/catalog"]
+        SnapshotAPI["GET /api/v1/state/snapshot"]
+
+        SceneRepo --> FloorsAPI
+        SceneRepo --> SceneAPI
+        CatalogRepo --> CatalogAPI
+        CatalogRepo --> Snapshot
+        Snapshot --> SnapshotAPI
+    end
+
+    subgraph Frontend["React frontend"]
+        Query["TanStack Query"]
+        Store["Zustand UI state"]
+        Workspace["OperatorWorkspace"]
+        Renderers["FloorScene / BuildingOverview"]
+        Deck["deck.gl layers"]
+        Card["Selected DeviceCard"]
+
+        Query --> Workspace
+        Store --> Workspace
+        Workspace --> Renderers
+        Renderers --> Deck
+        Workspace --> Card
+    end
+
+    Scenes --> SceneRepo
+    CatalogFile --> CatalogRepo
+    FloorsAPI --> Query
+    CatalogAPI --> Query
+    SnapshotAPI --> Query
+    SceneAPI --> Renderers
 ```
 
 The browser never receives raw IFC or protocol-specific frames and never talks directly to physical-system gateways.
@@ -110,6 +148,8 @@ transport: pending -> accepted -> executed
 - `npm run contracts:check` fails when committed generated schemas are stale.
 - ADR-0004 defines state separation; ADR-0005 defines realtime recovery.
 
-## Stage 3 implementation boundary
+## Stage 4 implementation boundary
 
-Stage 3 exposes the stable catalog endpoint and renders one floor through a deck.gl `IconLayer`. It intentionally does not select a hot-store library, implement WebSocket transport, or add telemetry/status to stable metadata. Those dependencies and implementations remain in their approved later stages; the contracts above keep those choices replaceable.
+Stage 4 serves eight scenes, renders floor/building modes and exposes a deterministic read-only status snapshot. TanStack Query owns server documents; Zustand owns shared UI state. The snapshot is indexed for rendering without adding status to stable metadata.
+
+Stage 4 intentionally does not implement WebSocket transport or the indexed external hot store shown in the target architecture. Those belong to Stage 5. The static snapshot uses the final contract shape so the data source can change without rewriting scene/catalog boundaries.

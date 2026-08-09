@@ -52,8 +52,24 @@
 - [x] Add API, UI, and browser tests for the vertical slice.
 - [x] Run full Stage 3 verification.
 - [x] Present Stage 3 for approval.
-- [ ] Receive explicit Stage 3 approval.
+- [x] Receive explicit Stage 3 approval.
+
+## Stage 4 — floor mode and building overview
+
+- [x] Serve all eight prepared floors through floor and scene APIs.
+- [x] Add floor switching while preserving independent scene/device data flows.
+- [x] Add a side-by-side building overview with all floors and 18,000 devices.
+- [x] Preserve pan, zoom, fit, and GPU picking in floor and overview modes.
+- [x] Add plan, device-icon, and label LOD behavior.
+- [x] Add search and filters by device type and protocol.
+- [x] Add the approved Stage 4 status source and status filtering.
+- [x] Keep warning/critical devices visible at every LOD.
+- [x] Add API, UI, and browser coverage for floor/overview workflows.
+- [x] Update frontend/backend architecture and Stage 4 report.
+- [x] Run full Stage 4 verification.
+- [x] Present Stage 4 for approval.
+- [ ] Receive explicit Stage 4 approval.
 
 ## Later stages
 
-Blocked until explicit user approval after Stage 3.
+Blocked until explicit user approval after Stage 4.

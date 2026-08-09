@@ -1,227 +1,181 @@
 # Backend architecture
 
-- Актуально на: 2026-08-08
-- Текущий этап: Stage 3, готов к приёмке
-- Назначение: живое описание реализованного backend; документ обновляется при завершении каждого этапа и при существенном изменении API, хранения данных или runtime topology.
+- Актуально на: 2026-08-09
+- Текущий этап: Stage 4, реализован, ожидает приёмки
+- Назначение: живое описание реализованного backend; обновляется при каждом этапе и существенном изменении API, хранения или runtime topology.
 
 ## Роль backend
 
-Backend — Node.js/TypeScript-приложение на Fastify. Он создаёт стабильную HTTP-границу между браузером и подготовленными offline-данными.
+Backend — Node.js/TypeScript-приложение на Fastify. Он выдаёт браузеру подготовленную геометрию, stable device metadata и отдельный read-only operational snapshot.
 
-```text
-Browser
-  ├── GET  /api/health
-  ├── GET  /api/floors
-  ├── POST /api/scene/query
-  └── GET  /api/v1/catalog
-                 │
-              Fastify
-                 │
-      ┌──────────┴──────────┐
-      │                     │
-prepared floor scene   device catalog
-scene JSON             gzip JSON
+```mermaid
+flowchart LR
+    FloorIndex["floor-index.json"]
+    Scenes["8 scene JSONs"]
+    CatalogFile["18k catalog.gz"]
+
+    SceneRepo["SceneRepository<br/>ordered floors + Map by floorId"]
+    CatalogRepo["DeviceCatalog<br/>stable metadata"]
+    Snapshot["StateSnapshot<br/>status + telemetry"]
+
+    FloorsAPI["GET /api/floors"]
+    SceneAPI["POST /api/scene/query"]
+    CatalogAPI["GET /api/v1/catalog"]
+    SnapshotAPI["GET /api/v1/state/snapshot"]
+
+    FloorIndex --> SceneRepo
+    Scenes --> SceneRepo
+    CatalogFile --> CatalogRepo
+    CatalogRepo --> Snapshot
+
+    SceneRepo --> FloorsAPI
+    SceneRepo --> SceneAPI
+    CatalogRepo --> CatalogAPI
+    Snapshot --> SnapshotAPI
 ```
 
-Fastify не выполняет рендеринг, не разбирает IFC во время запроса и не подключается к физическим устройствам. IFC обрабатывается отдельным offline pipeline.
+Backend не рендерит планы, не разбирает IFC на запросе и не подключается к физическим устройствам. Raw IFC обрабатывает отдельный offline pipeline.
 
 ## Почему Fastify
 
-Fastify выполняет ту же архитектурную роль, что и Express: маршрутизация, request/response lifecycle, plugins и раздача static assets. Для проекта он выбран как современная TypeScript-friendly альтернатива с удобным `app.inject()` для тестов и подходящей plugin-моделью для будущего realtime transport.
+Fastify выполняет ту же роль, что Express: routes, lifecycle, plugins и static assets. Он выбран как TypeScript-friendly альтернатива с удобным `app.inject()` для тестов и plugin-моделью. Сейчас используются `@fastify/static` и `@fastify/compress`; Stage 5 сможет добавить realtime transport, не меняя application boundary.
 
-Текущая реализация не зависит от специфической высокой производительности Fastify: Express также мог бы обслуживать этот объём. Основная ценность здесь — явная backend-граница и тестируемый application factory.
+Высокая производительность Fastify сама по себе не является архитектурной гарантией. Для MVP важнее явные контракты, startup validation и тестируемый `buildApp()`.
 
 ## Runtime topology
 
-### Development
+Development:
 
 ```text
-Browser
-  │ http://<host>:5173
-  ▼
-Vite dev server
-  ├── HTML / React modules / HMR
-  └── /api/* proxy
-           │
-           ▼
-Fastify http://127.0.0.1:3001
+Browser :5173 -> Vite / HMR
+                    └── /api proxy -> Fastify 127.0.0.1:3001
 ```
 
-Frontend использует относительные `/api/*` URL. Vite proxy пересылает их в Fastify, поэтому CORS для штатного dev-потока не нужен.
+Frontend использует относительные `/api/*`, поэтому штатному LAN/dev-потоку не нужен CORS.
 
-### Production
+Production:
 
 ```text
-Browser
-  │ one origin
-  ▼
-Fastify
-  ├── /api/*
-  └── dist/web/*
+Browser -> one Fastify origin
+           ├── /api/*
+           └── dist/web/* + SPA fallback
 ```
 
-При `NODE_ENV=production` Fastify подключает `@fastify/static` и раздаёт Vite build. Не-API GET fallback возвращает `index.html`, чтобы frontend routes могли обслуживаться как SPA. Render запускает один Node service и проверяет `/api/health`.
+Render запускает один Node service и проверяет `/api/health`. JSON-ответы больше 1 024 bytes сжимаются `@fastify/compress` при поддерживаемом `Accept-Encoding`.
 
-## Startup lifecycle
+## Startup lifecycle и repositories
 
-Entry point `src/server/index.ts`:
+`src/server/index.ts` читает `PORT`, `HOST`, `NODE_ENV`, строит приложение и корректно закрывает его на `SIGINT/SIGTERM`. Network listener отделён от `buildApp()`, поэтому API tests работают через `app.inject()`.
 
-1. читает `PORT`, `HOST` и `NODE_ENV`;
-2. вызывает `buildApp({ serveStatic: isProduction })`;
-3. начинает слушать порт;
-4. обрабатывает `SIGINT` и `SIGTERM` через graceful `app.close()`.
+### Scene repository
 
-Application factory отделён от сетевого listener. Благодаря этому тесты создают Fastify instance и вызывают routes через `app.inject()` без реального порта.
+`scene-repository.ts`:
 
-## Источники runtime-данных
+1. читает `west-riverside.floor-index.json`;
+2. валидирует индекс;
+3. по `sceneFile` читает и валидирует восемь `PreparedScene`;
+4. проверяет соответствие floor ID;
+5. сохраняет упорядоченные summaries и `Map<floorId, scene>`.
 
-### Prepared scene
+Все подготовленные scenes вместе занимают около 1,2 МБ. Они загружаются один раз при старте. `sceneDatasetVersion` берётся из floor index.
 
-`src/server/scene-fixture.ts` читает `data/generated/west-riverside-level-1.scene.json`, парсит JSON и валидирует его через `PreparedSceneSchema`.
+### Device catalog repository
 
-В памяти сохраняются:
+`device-catalog.ts` синхронно читает и распаковывает `west-riverside.devices-18000.json.gz`, валидирует полный `DeviceCatalog` и хранит его в памяти. Gzip-файл около 471 КБ. `selectCatalogFloors()` создаёт floor/building scope линейной фильтрацией массива.
 
-- floor metadata;
-- source/provenance архитектурной модели;
-- полный массив подготовленных `SceneFeature` Level 1.
+### Stage 4 snapshot source
 
-Raw IFC не загружается и не разбирается backend во время работы.
+`state-snapshot.ts` отдельно от catalog вычисляет один детерминированный `DeviceTelemetry` на устройство:
 
-### Device catalog
+- fixed timestamp и revision;
+- status/connection по стабильному hash `deviceId`;
+- telemetry values в соответствии с объявленными capabilities;
+- `normal`: 16 906, `warning`: 473, `critical`: 189, `offline`: 432;
+- пустые alarms/commands и sequence `0`.
 
-`src/server/device-catalog.ts` при старте:
-
-1. читает `west-riverside.devices-18000.json.gz`;
-2. распаковывает gzip через `gunzipSync`;
-3. парсит JSON;
-4. валидирует полный каталог через `DeviceCatalogSchema`;
-5. сохраняет 18 000 stable device metadata records в памяти.
-
-`selectCatalogFloors()` формирует floor-scoped ответ, фильтруя floor и device arrays. Для Level 1 возвращается 2 900 устройств.
+Snapshot валидируется целиком через `StateSnapshotSchema`. Это read-only fixture для Stage 4 UI, а не realtime simulator. Status не записывается в `DeviceMetadata`.
 
 ## HTTP API
 
-### Health
+### `GET /api/health`
 
-```http
-GET /api/health
-```
+Возвращает `{ "status": "ok" }`; используется Render и production smoke test.
 
-Возвращает `{ "status": "ok" }`. Используется production smoke test и Render health check.
+### `GET /api/floors`
 
-### Floors
+Возвращает восемь подготовленных этажей в порядке `order`: Level 1–6, Level 7A, Level 7. Каждый summary содержит ID, name, elevation, bounds и order.
 
-```http
-GET /api/floors
-```
+### `POST /api/scene/query`
 
-Сейчас возвращает только Level 1 scene fixture. Полный переход на восемь подготовленных этажей относится к Stage 4.
-
-### Viewport-aware scene
-
-```http
-POST /api/scene/query
-Content-Type: application/json
-
+```json
 {
-  "floorId": "west-riverside-level-1",
-  "viewport": {
-    "bbox": [minX, minY, maxX, maxY],
-    "width": 1200,
-    "height": 800
-  },
+  "floorId": "west-riverside-level-2",
+  "viewport": { "bbox": [0, 0, 104, 98], "width": 1200, "height": 800 },
   "zoom": 3.5
 }
 ```
 
-Обработка:
+`SceneQuerySchema` валидирует body. Repository находит этаж, после чего backend оставляет features, пересекающие bbox и удовлетворяющие `minZoom <= zoom <= maxZoom`. Bands: `overview < 1.7`, `standard < 4.1`, иначе `detail`. `sceneVersion` объединяет dataset version и floor ID. Устройств в ответе нет.
 
-1. `SceneQuerySchema` валидирует body.
-2. Backend проверяет `floorId`.
-3. Для каждого feature проверяется пересечение его `bbox` с viewport bbox.
-4. Проверяется диапазон `feature.minZoom <= zoom <= feature.maxZoom`.
-5. Ответ получает `overview`, `standard` или `detail` zoom band.
-6. Возвращается только подходящий массив архитектурных features.
-
-Endpoint не содержит устройств. Его данные используются `PolygonLayer`, `PathLayer` и `TextLayer`.
-
-### Stable device catalog
+### `GET /api/v1/catalog`
 
 ```http
-GET /api/v1/catalog?buildingId=west-riverside&floorIds=west-riverside-level-1
+GET /api/v1/catalog?buildingId=west-riverside&floorIds=<id>&floorIds=<id>
 ```
 
-Обработка:
+`floorIds` опционален и повторяем. Без него возвращается весь каталог на 18 000 устройств. Endpoint проверяет building/floors, возвращает только stable metadata, добавляет scope-dependent `ETag` и `Cache-Control: public, max-age=300, stale-while-revalidate=60`; совпавший `If-None-Match` получает `304`.
 
-1. `CatalogQuerySchema` валидирует query parameters.
-2. Backend проверяет building и каждый floor ID.
-3. Каталог фильтруется по выбранным этажам.
-4. Из `catalogVersion` и floor IDs вычисляется `ETag`.
-5. При совпадающем `If-None-Match` возвращается `304`.
-6. Иначе возвращаются building, выбранные floors, devices и `totalDevices`.
+### `GET /api/v1/state/snapshot`
 
-Ответ кешируется с `Cache-Control: public, max-age=300, stale-while-revalidate=60`. Endpoint возвращает только stable metadata и не добавляет telemetry/status.
+Query scope совпадает с catalog. Ответ содержит отдельные `telemetry`, `alarms`, `commands`, `streamId`, `sequence` и `generatedAt`. Для одного этажа число telemetry records равно числу устройств его catalog; без `floorIds` возвращается 18 000. Snapshot имеет собственный scope-dependent `ETag`, caching и `304`.
 
-## Контракты
+## Контракты и разделение данных
 
 Runtime source of truth находится в `src/shared`:
 
-- `scene-contracts.ts` — floor, scene query и scene response;
-- `domain-contracts.ts` — building, floor, device, telemetry, alarm и command entities;
-- `api-contracts.ts` — catalog, snapshot, acknowledge и command API;
-- `realtime-contracts.ts` — будущий ordered realtime transport.
-
-Zod используется на границе входящих запросов и при startup-валидации подготовленных данных. Backend-independent Draft 2020-12 schemas генерируются в `contracts/` и проверяются командой `npm run contracts:check`.
-
-## Scene и catalog не мержатся
-
-Backend обслуживает два независимых data products:
+- `scene-contracts.ts` — floor, scene query/response;
+- `domain-contracts.ts` — metadata, telemetry, alarm, command;
+- `api-contracts.ts` — catalog/snapshot/operational REST;
+- `realtime-contracts.ts` — Stage 5 ordered transport.
 
 ```text
-prepared scene  -> архитектурные features
-device catalog  -> stable device metadata
+scene repository    -> geometry, keyed by floorId
+device catalog      -> stable metadata, keyed by deviceId/floorId
+state snapshot      -> mutable-shaped data, keyed by deviceId
 ```
 
-Связь обеспечивается одинаковым `floorId` и общей floor-local системой координат. На frontend они поступают в разные deck.gl layers. Сейчас `sceneVersion` и `catalogVersion` независимы; общий compatibility/dataset version ещё не проверяется runtime.
+Данные не мержатся на backend. JSON Schema artifacts в `contracts/` генерируются из Zod и проверяются `npm run contracts:check`.
 
-## Ошибки и валидация
+## Ошибки, caching и compression
 
-Сейчас routes возвращают:
+- `400` — schema-invalid query/body;
+- `404` — неизвестный building/floor;
+- `304` — совпавший catalog/snapshot ETag;
+- `200` — успешный ответ.
 
-- `400` для некорректной структуры запроса;
-- `404` для неизвестного building/floor;
-- `304` для неизменившегося каталога;
-- `200` для успешного ответа.
+Stage 0/3/4 routes ещё используют упрощённые `{ error, details? }`; единый `ApiError` middleware остаётся будущим улучшением. Compression применяется глобально к достаточно большим ответам, но ETag вычисляется из version/scope, а не из encoded body.
 
-Stage 1 определил единый `ApiError`, но текущие Stage 0/3 endpoints пока используют упрощённые `{ error, details? }` payloads. Унификация error middleware остаётся отдельной задачей.
+## Проверки Stage 4
 
-## Тестирование
+API coverage проверяет:
 
-API tests используют `buildApp()` и `app.inject()`:
+- список и порядок восьми этажей;
+- scene query другого этажа и dataset-aware version;
+- viewport/zoom filtering;
+- одиночный и повторяемый floor scope каталога;
+- отсутствие status в stable metadata;
+- deterministic snapshot на 2 900 и 18 000 records;
+- наличие warning/critical, connection invariant, ETag и `304`;
+- validation errors для неизвестных scopes.
 
-- проверяют runtime-валидность scene response;
-- проверяют viewport filtering;
-- проверяют zoom LOD;
-- проверяют invalid/unknown queries;
-- проверяют ровно 2 900 устройств Level 1;
-- проверяют разделение IFC/synthetic provenance;
-- проверяют отсутствие hot status в stable metadata;
-- проверяют `ETag` и `304`.
+Production smoke проверяет compiled server, HTML, scene, catalog и snapshot.
 
-Production smoke запускает скомпилированный Node server, проверяет HTML, scene query и floor-scoped catalog.
+## Ограничения и следующий шаг
 
-## Текущие ограничения
+- Scenes, catalog и snapshot находятся в памяти одного процесса и синхронно загружаются при старте.
+- Floor selection линейно фильтрует 18 000 records; индексы пока не нужны по измерениям этого этапа.
+- Нет database, authentication/authorization, audit log и включённого Fastify logger.
+- Snapshot статичен: нет WebSocket, replay, reconnect, resync и live updates.
+- Scene/catalog/snapshot имеют отдельные version tokens; runtime compatibility handshake ещё не реализован.
 
-- Scene API обслуживает только Level 1, хотя offline pipeline уже подготовил восемь этажей.
-- Scene features и полный каталог хранятся в памяти одного процесса.
-- Catalog floor selection выполняет линейную фильтрацию 18 000 devices на запрос.
-- Используются синхронные startup read/gunzip/parse; это допустимо для текущего единовременного запуска.
-- Нет базы данных, authentication/authorization и production audit log.
-- Fastify logger пока отключён.
-- Нет response compression plugin на origin.
-- Нет snapshot, commands, alarms и WebSocket runtime, хотя их контракты определены.
-- Нет общего version token, подтверждающего совместимость scene и catalog.
-
-## Следующие изменения
-
-Stage 4 должен перевести scene repository на восемь этажей и добавить building/floor queries. Stage 5 добавит mock realtime transport, authoritative snapshot и индексированное hot state. По мере роста backend следует выделить repositories/services, единый error handler, dataset compatibility version и измерить необходимость индексов или другого хранения до добавления инфраструктуры.
+Stage 5 должен превратить operational boundary в authoritative snapshot + mock ordered event stream, оставив catalog стабильным и заменяемым production backend.
