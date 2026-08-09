@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { z } from 'zod';
 import { PreparedSceneSchema } from '../../src/shared/scene-contracts.js';
+import { SCENE_MAX_ZOOM, SCENE_MIN_ZOOM } from '../../src/shared/scene-contracts.js';
 
 const FloorIndexSchema = z.object({
   datasetVersion: z.string().min(1),
@@ -60,6 +61,15 @@ for (const floor of index.floors) {
     || scene.stats.featureCount !== floor.featureCount) {
     throw new Error(`Feature count mismatch for ${floor.id}`);
   }
+  const baseShells = scene.features.filter((feature) => (
+    feature.kind === 'floor-shell'
+    && feature.geometryType === 'polygon'
+    && feature.minZoom <= SCENE_MIN_ZOOM
+    && feature.maxZoom >= SCENE_MAX_ZOOM
+  ));
+  if (baseShells.length !== 1) {
+    throw new Error(`Expected exactly one full-range floor-shell for ${floor.id}`);
+  }
   const byZoomBand = {
     overview: scene.features.filter((feature) => feature.minZoom <= 1 && feature.maxZoom >= 1).length,
     standard: scene.features.filter((feature) => feature.minZoom <= 3 && feature.maxZoom >= 3).length,
@@ -67,6 +77,9 @@ for (const floor of index.floors) {
   };
   if (JSON.stringify(byZoomBand) !== JSON.stringify(floor.byZoomBand)) {
     throw new Error(`LOD count mismatch for ${floor.id}`);
+  }
+  if (Object.values(byZoomBand).some((count) => count === 0)) {
+    throw new Error(`Every LOD band must contain base geometry for ${floor.id}`);
   }
   totalFeatures += floor.featureCount;
 }

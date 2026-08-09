@@ -7,6 +7,7 @@ import type {
 import type { FloorSummary } from '../../shared/scene-contracts';
 import { DeviceCard } from './DeviceCard';
 import { SceneControls } from './SceneControls';
+import { sceneEmptyMessage } from './scene-empty-state';
 import { useElementSize } from './use-element-size';
 import { useFloorScene } from './use-floor-scene';
 import { useFloorSceneLayers } from './use-floor-scene-layers';
@@ -43,6 +44,7 @@ export const FloorScene = ({
     telemetryByDeviceId,
     selectedDevice,
   });
+  const emptySceneMessage = sceneEmptyMessage(controller.scene);
 
   return (
     <div
@@ -72,6 +74,11 @@ export const FloorScene = ({
         {controller.error
           ?? `${controller.scene?.zoomBand ?? 'loading'} · ${controller.scene?.meta.returnedFeatures ?? 0}/${controller.scene?.meta.totalFeatures ?? 0} features · ${devices.length} devices · ${priorityDeviceCount} priority · z ${controller.viewState.zoom.toFixed(2)}${controller.loading ? ' · updating' : ''}`}
       </div>
+      {emptySceneMessage && (
+        <div className="scene__empty-state" role="status">
+          {emptySceneMessage}
+        </div>
+      )}
       {selectedDevice && selectedDevice.floorId === floor.id && (
         <DeviceCard
           device={selectedDevice}

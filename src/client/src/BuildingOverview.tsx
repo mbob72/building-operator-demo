@@ -262,6 +262,7 @@ export const BuildingOverview = ({
 
   const queryError = sceneQueries.find((query) => query.error)?.error;
   const loadedScenes = sceneQueries.filter((query) => query.data).length;
+  const emptyScenes = sceneQueries.filter((query) => query.data?.meta.returnedFeatures === 0).length;
 
   return (
     <div
@@ -305,7 +306,7 @@ export const BuildingOverview = ({
         <span className={`status-dot ${queryError ? 'status-dot--error' : ''}`} />
         {queryError instanceof Error
           ? queryError.message
-          : `${band} · ${loadedScenes}/${floors.length} floors · ${devices.length} devices · ${deviceGroups.priority.length} priority · z ${viewState.zoom.toFixed(2)}${sceneQueries.some((query) => query.isFetching) ? ' · updating' : ''}`}
+          : `${band} · ${loadedScenes}/${floors.length} floors${emptyScenes ? ` · ${emptyScenes} empty` : ''} · ${devices.length} devices · ${deviceGroups.priority.length} priority · z ${viewState.zoom.toFixed(2)}${sceneQueries.some((query) => query.isFetching) ? ' · updating' : ''}`}
       </div>
       {selectedDevice && (
         <DeviceCard

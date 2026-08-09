@@ -207,11 +207,36 @@ def extract_with_metadata(
 
     width = max_x - min_x + margin * 2
     height = max_y - min_y + margin * 2
+    shell = MultiPoint([
+        point
+        for feature in extracted
+        for point in feature["coordinates"]
+    ]).convex_hull
+    if not isinstance(shell, Polygon) or shell.area < 0.002:
+        raise RuntimeError("Floor geometry did not produce a valid simplified floor shell")
+
+    identifier = floor_id(storey_name)
+    shell_coordinates = [
+        [rounded(point[0]), rounded(point[1])]
+        for point in list(shell.exterior.coords)[:-1]
+    ]
+    shell_xs = [point[0] for point in shell_coordinates]
+    shell_ys = [point[1] for point in shell_coordinates]
+    extracted.insert(0, {
+        "id": f"base-{identifier}-shell",
+        "kind": "floor-shell",
+        "geometryType": "polygon",
+        "coordinates": shell_coordinates,
+        "bbox": [min(shell_xs), min(shell_ys), max(shell_xs), max(shell_ys)],
+        "minZoom": -8.0,
+        "maxZoom": 24.0,
+        "name": f"{storey_name} simplified footprint",
+    })
+
     counts: dict[str, int] = {}
     for feature in extracted:
         counts[feature["kind"]] = counts.get(feature["kind"], 0) + 1
 
-    identifier = floor_id(storey_name)
     scene = {
         "source": {
             "project": "West Riverside Hospital",

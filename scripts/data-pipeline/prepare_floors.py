@@ -54,7 +54,7 @@ def prepare(ifc_path: Path, output_dir: Path) -> dict[str, Any]:
         )
 
     index = {
-        "datasetVersion": "west-riverside-stage-2-v1",
+        "datasetVersion": "west-riverside-stage-2-v2",
         "generatedAt": "2026-08-07T00:00:00.000Z",
         "building": {
             "id": "west-riverside",

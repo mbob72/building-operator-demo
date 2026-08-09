@@ -78,10 +78,16 @@
         "features": { "type": "array", "items": { "$ref": "#/$defs/feature" } },
         "meta": {
           "type": "object",
-          "required": ["totalFeatures", "returnedFeatures"],
+          "required": ["totalFeatures", "returnedFeatures", "emptyReason"],
           "properties": {
             "totalFeatures": { "type": "integer", "minimum": 0 },
-            "returnedFeatures": { "type": "integer", "minimum": 0 }
+            "returnedFeatures": { "type": "integer", "minimum": 0 },
+            "emptyReason": {
+              "oneOf": [
+                { "enum": ["viewport-outside-floor", "no-spatial-features", "lod-filtered"] },
+                { "type": "null" }
+              ]
+            }
           }
         }
       }

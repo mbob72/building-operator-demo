@@ -1,5 +1,8 @@
 import { z } from 'zod';
 
+export const SCENE_MIN_ZOOM = -8;
+export const SCENE_MAX_ZOOM = 24;
+
 export const BBoxSchema = z.tuple([
   z.number().finite(),
   z.number().finite(),
@@ -16,7 +19,7 @@ export const SceneQuerySchema = z.object({
     width: z.number().int().positive().max(16_384),
     height: z.number().int().positive().max(16_384),
   }),
-  zoom: z.number().finite().min(-8).max(24),
+  zoom: z.number().finite().min(SCENE_MIN_ZOOM).max(SCENE_MAX_ZOOM),
 });
 
 const FeatureBaseSchema = z.object({
@@ -79,7 +82,42 @@ export const PreparedSceneSchema = z.object({
       detail: z.number().int().nonnegative(),
     }).optional(),
   }),
+}).superRefine((scene, context) => {
+  const baseShell = scene.features.find((feature) => (
+    feature.kind === 'floor-shell'
+    && feature.geometryType === 'polygon'
+    && feature.minZoom <= SCENE_MIN_ZOOM
+    && feature.maxZoom >= SCENE_MAX_ZOOM
+  ));
+  if (!baseShell) {
+    context.addIssue({
+      code: 'custom',
+      path: ['features'],
+      message: 'prepared scene requires a floor-shell visible across the supported zoom range',
+    });
+    return;
+  }
+
+  const coversAllFeatureBounds = scene.features.every((feature) => (
+    baseShell.bbox[0] <= feature.bbox[0]
+    && baseShell.bbox[1] <= feature.bbox[1]
+    && baseShell.bbox[2] >= feature.bbox[2]
+    && baseShell.bbox[3] >= feature.bbox[3]
+  ));
+  if (!coversAllFeatureBounds) {
+    context.addIssue({
+      code: 'custom',
+      path: ['features'],
+      message: 'base floor-shell bbox must cover every prepared feature bbox',
+    });
+  }
 });
+
+export const SceneEmptyReasonSchema = z.enum([
+  'viewport-outside-floor',
+  'no-spatial-features',
+  'lod-filtered',
+]);
 
 export const SceneResponseSchema = z.object({
   sceneVersion: z.string(),
@@ -91,6 +129,7 @@ export const SceneResponseSchema = z.object({
   meta: z.object({
     totalFeatures: z.number().int().nonnegative(),
     returnedFeatures: z.number().int().nonnegative(),
+    emptyReason: SceneEmptyReasonSchema.nullable(),
   }),
 });
 
@@ -100,3 +139,4 @@ export type SceneFeature = z.infer<typeof SceneFeatureSchema>;
 export type FloorSummary = z.infer<typeof FloorSummarySchema>;
 export type SceneResponse = z.infer<typeof SceneResponseSchema>;
 export type PreparedScene = z.infer<typeof PreparedSceneSchema>;
+export type SceneEmptyReason = z.infer<typeof SceneEmptyReasonSchema>;

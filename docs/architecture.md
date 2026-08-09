@@ -143,7 +143,7 @@ transport: pending -> accepted -> executed
 
 ## Contract sources
 
-- Runtime source of truth: `src/shared/domain-contracts.ts`, `api-contracts.ts`, and `realtime-contracts.ts`.
+- Runtime source of truth: `src/shared/scene-contracts.ts`, `domain-contracts.ts`, `api-contracts.ts`, and `realtime-contracts.ts`.
 - Backend-independent artifacts: generated JSON Schema in `contracts/`.
 - `npm run contracts:check` fails when committed generated schemas are stale.
 - ADR-0004 defines state separation; ADR-0005 defines realtime recovery.
@@ -153,3 +153,5 @@ transport: pending -> accepted -> executed
 Stage 4 serves eight scenes, renders floor/building modes and exposes a deterministic read-only status snapshot. TanStack Query owns server documents; Zustand owns shared UI state. The snapshot is indexed for rendering without adding status to stable metadata.
 
 Stage 4 intentionally does not implement WebSocket transport or the indexed external hot store shown in the target architecture. Those belong to Stage 5. The static snapshot uses the final contract shape so the data source can change without rewriting scene/catalog boundaries.
+
+Post-acceptance geometry hardening adds one generated convex-hull `floor-shell` per prepared floor. It is visible across the complete supported zoom range `[-8, 24]` and its bbox covers every other feature bbox. Successful empty scene responses expose `meta.emptyReason`, distinguishing a viewport outside floor bounds, an in-floor viewport without spatial candidates, and candidates removed by LOD.

@@ -65,3 +65,7 @@ Stage 2 uses IFC2X3 for Electrical, Fire Alarm, Mechanical, and Sprinklers. The 
 ## A-014 Device provenance
 
 IFC-origin devices retain source file, IFC class, numeric entity ID, and GlobalId. Their operational binding remains explicitly simulated and synthetic. Missing categories are generated with a fixed seed and never presented as IFC-derived protocol addresses.
+
+## A-015 Simplified base floor geometry
+
+The convex hull of all prepared architectural feature coordinates is an intentionally simplified base footprint, not an exact room, façade, or navigable-area boundary. It exists to preserve floor context across the supported LOD range and is replaceable by a higher-fidelity footprint without changing the scene API, provided one full-range `floor-shell` continues to cover every prepared feature bbox.

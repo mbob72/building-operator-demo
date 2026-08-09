@@ -176,6 +176,22 @@ h1 { margin: 0; font-size: clamp(20px, 2vw, 28px); font-weight: 500; letter-spac
 .status-dot { width: 6px; height: 6px; border-radius: 50%; background: #63d0a1; box-shadow: 0 0 8px #63d0a1; }
 .status-dot--error { background: #ff6b66; box-shadow: 0 0 8px #ff6b66; }
 
+.scene__empty-state {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 2;
+  width: min(380px, calc(100% - 40px));
+  padding: 14px 18px;
+  border: 1px solid #3a5a60;
+  color: #9bb7b6;
+  background: rgba(7, 19, 23, 0.92);
+  font: 11px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+  text-align: center;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
 .device-card {
   position: absolute;
   top: 66px;

@@ -79,6 +79,45 @@ describe('scene API', () => {
     expect(detail.json().meta.returnedFeatures).toBeGreaterThan(overview.json().meta.returnedFeatures);
   });
 
+  it('returns full-range base geometry for every prepared floor', async () => {
+    const app = createApp();
+    const floorResponse = await app.inject({ method: 'GET', url: '/api/floors' });
+    const preparedFloors = FloorSummarySchema.array().parse(floorResponse.json().floors);
+
+    for (const floor of preparedFloors) {
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/scene/query',
+        payload: {
+          floorId: floor.id,
+          viewport: { bbox: floor.bounds, width: 800, height: 600 },
+          zoom: -8,
+        },
+      });
+      const scene = SceneResponseSchema.parse(response.json());
+      expect(scene.features.some((feature) => feature.kind === 'floor-shell')).toBe(true);
+      expect(scene.meta.returnedFeatures).toBeGreaterThan(0);
+      expect(scene.meta.emptyReason).toBeNull();
+    }
+  });
+
+  it('returns an explicit empty reason outside floor bounds', async () => {
+    const response = await createApp().inject({
+      method: 'POST',
+      url: '/api/scene/query',
+      payload: {
+        floorId: 'west-riverside-level-1',
+        viewport: { bbox: [1_000, 1_000, 1_010, 1_010], width: 800, height: 600 },
+        zoom: 2,
+      },
+    });
+    const scene = SceneResponseSchema.parse(response.json());
+
+    expect(scene.features).toEqual([]);
+    expect(scene.meta.returnedFeatures).toBe(0);
+    expect(scene.meta.emptyReason).toBe('viewport-outside-floor');
+  });
+
   it('serves prepared geometry for a floor other than Level 1', async () => {
     const response = await createApp().inject({
       method: 'POST',
@@ -93,7 +132,7 @@ describe('scene API', () => {
     expect(response.statusCode).toBe(200);
     const scene = SceneResponseSchema.parse(response.json());
     expect(scene.floor.id).toBe('west-riverside-level-7a');
-    expect(scene.sceneVersion).toBe('west-riverside-stage-2-v1:west-riverside-level-7a');
+    expect(scene.sceneVersion).toBe('west-riverside-stage-2-v2:west-riverside-level-7a');
     expect(scene.features.length).toBeGreaterThan(0);
   });
 

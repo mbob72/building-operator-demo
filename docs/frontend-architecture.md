@@ -1,7 +1,7 @@
 # Frontend architecture
 
 - Актуально на: 2026-08-09
-- Текущий этап: Stage 4, реализован, ожидает приёмки
+- Текущий этап: Stage 4, принят 2026-08-09
 - Назначение: живое описание реализованного frontend; обновляется при каждом этапе и существенном изменении data flow.
 
 ## Пользовательский результат
@@ -56,6 +56,8 @@ GET  /api/v1/state/...  -> DeviceTelemetry[]    -> color/status/card values
 ### Архитектурная сцена
 
 `SceneFeature` содержит только `floor-shell`, `zone`, `wall`, `column`, `door`, `window`, `stair` и `label`. В floor mode запрос зависит от viewport и zoom, выполняется с debounce 100 мс, а предыдущий запрос отменяется. В building overview React Query получает по одной полной floor-local сцене на этаж для текущего zoom band и повторно использует кеш между переключениями.
+
+Каждый этаж содержит один базовый `floor-shell`, видимый во всём поддерживаемом zoom. Если успешный scene response всё же пуст, `meta.emptyReason` отличает viewport вне этажа, отсутствие spatial features и LOD filtering. `FloorScene` показывает оператору центральный diagnostic empty-state с подсказкой Fit; `BuildingOverview` выводит количество пустых floor responses в status overlay. Loading и transport error остаются отдельными состояниями.
 
 ### Stable device catalog
 
@@ -271,12 +273,14 @@ Architecture bands:
 | `src/client/src/device-layers.ts` | общие status partition и фабрика device `IconLayer` |
 | `src/client/src/device-visuals.ts` | atlas mapping, status colors, icon LOD |
 | `src/client/src/scene-visuals.ts` | scene colors и zoom bands |
+| `src/client/src/scene-empty-state.ts` | перевод contract empty reason в операторскую диагностику |
 | `src/client/src/viewport.ts` | floor/building fit и bbox conversion |
 
 ## Тестовые границы
 
 - Чистые unit-тесты фиксируют status partition, поиск и комбинации filters, label zoom thresholds, viewport culling, deduplication и лимит 180.
 - Hook-тест `useFloorScene` с fake timers фиксирует 100 мс debounce, bbox/zoom request и abort устаревшего запроса при смене камеры.
+- Scene contract/API tests фиксируют обязательный base shell и три причины успешного пустого ответа; UI unit-тест фиксирует соответствующие сообщения.
 - Chromium E2E проверяет связанный пользовательский поток: floor switch, filters, overview, zoom и GPU picking.
 
 ## Ограничения и следующий шаг

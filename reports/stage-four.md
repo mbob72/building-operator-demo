@@ -1,7 +1,7 @@
 # Stage 4 report — floor mode and building overview
 
 Дата: 2026-08-08  
-Статус: реализован, ожидает пользовательской приёмки
+Статус: принят пользователем 2026-08-09
 
 ## Результат
 
@@ -26,6 +26,7 @@
 - `OperatorWorkspace` и `FloorScene` оставлены тонкими компонентами-композициями; query/filter orchestration, camera/request lifecycle и layer construction вынесены в специализированные хуки.
 - Floor и building renderer используют общие zoom/fit controls и общую фабрику status-aware device layers.
 - Добавлены чистые unit-границы для device partition, filters и label LOD, а также hook-тест debounce/abort lifecycle floor scene.
+- После приёмки закрыт `ARCH-001`: dataset `stage-2-v2` содержит full-range base shell на каждом этаже, API возвращает explicit empty reason, frontend показывает диагностический empty-state.
 
 ## Статический status dataset
 
@@ -46,7 +47,7 @@ Snapshot детерминирован по `deviceId`, имеет sequence `0` �
 | Проверка | Результат |
 |---|---|
 | TypeScript strict typecheck | пройдено |
-| Unit/contract/API tests | 31 из 31 пройдено |
+| Unit/contract/API tests | 44 из 44 пройдено |
 | Chromium workflow E2E | пройдено |
 | Production build | пройдено |
 | Production HTML/scene/catalog/snapshot smoke | пройдено |

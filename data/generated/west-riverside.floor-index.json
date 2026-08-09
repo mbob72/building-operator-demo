@@ -1,5 +1,5 @@
 {
-  "datasetVersion": "west-riverside-stage-2-v1",
+  "datasetVersion": "west-riverside-stage-2-v2",
   "generatedAt": "2026-08-07T00:00:00.000Z",
   "building": {
     "id": "west-riverside",
@@ -27,17 +27,18 @@
         -14.2404,
         45.1456
       ],
-      "featureCount": 1062,
+      "featureCount": 1063,
       "byKind": {
+        "floor-shell": 1,
         "wall": 473,
         "column": 147,
         "window": 303,
         "door": 139
       },
       "byZoomBand": {
-        "overview": 620,
-        "standard": 620,
-        "detail": 1062
+        "overview": 621,
+        "standard": 621,
+        "detail": 1063
       },
       "extractionMode": "horizontal-section",
       "order": 1,
@@ -58,17 +59,18 @@
         -14.2403,
         51.6733
       ],
-      "featureCount": 860,
+      "featureCount": 861,
       "byKind": {
+        "floor-shell": 1,
         "column": 147,
         "wall": 316,
         "window": 332,
         "door": 65
       },
       "byZoomBand": {
-        "overview": 463,
-        "standard": 463,
-        "detail": 860
+        "overview": 464,
+        "standard": 464,
+        "detail": 861
       },
       "extractionMode": "horizontal-section",
       "order": 2,
@@ -89,16 +91,17 @@
         -7.5344,
         50.0533
       ],
-      "featureCount": 549,
+      "featureCount": 550,
       "byKind": {
+        "floor-shell": 1,
         "wall": 368,
         "door": 112,
         "column": 69
       },
       "byZoomBand": {
-        "overview": 437,
-        "standard": 437,
-        "detail": 549
+        "overview": 438,
+        "standard": 438,
+        "detail": 550
       },
       "extractionMode": "horizontal-section",
       "order": 3,
@@ -119,16 +122,17 @@
         -7.0157,
         49.7889
       ],
-      "featureCount": 530,
+      "featureCount": 531,
       "byKind": {
+        "floor-shell": 1,
         "wall": 369,
         "door": 104,
         "column": 57
       },
       "byZoomBand": {
-        "overview": 426,
-        "standard": 426,
-        "detail": 530
+        "overview": 427,
+        "standard": 427,
+        "detail": 531
       },
       "extractionMode": "horizontal-section",
       "order": 4,
@@ -149,16 +153,17 @@
         2.8526,
         49.7889
       ],
-      "featureCount": 435,
+      "featureCount": 436,
       "byKind": {
+        "floor-shell": 1,
         "wall": 300,
         "door": 85,
         "column": 50
       },
       "byZoomBand": {
-        "overview": 350,
-        "standard": 350,
-        "detail": 435
+        "overview": 351,
+        "standard": 351,
+        "detail": 436
       },
       "extractionMode": "horizontal-section",
       "order": 5,
@@ -179,16 +184,17 @@
         25.9363,
         43.4081
       ],
-      "featureCount": 79,
+      "featureCount": 80,
       "byKind": {
+        "floor-shell": 1,
         "wall": 68,
         "column": 3,
         "door": 8
       },
       "byZoomBand": {
-        "overview": 71,
-        "standard": 71,
-        "detail": 79
+        "overview": 72,
+        "standard": 72,
+        "detail": 80
       },
       "extractionMode": "horizontal-section",
       "order": 6,
@@ -209,14 +215,15 @@
         26.381,
         45.9434
       ],
-      "featureCount": 154,
+      "featureCount": 155,
       "byKind": {
+        "floor-shell": 1,
         "zone": 154
       },
       "byZoomBand": {
-        "overview": 154,
-        "standard": 154,
-        "detail": 154
+        "overview": 155,
+        "standard": 155,
+        "detail": 155
       },
       "extractionMode": "horizontal-projection",
       "order": 7,
@@ -237,15 +244,16 @@
         38.3845,
         119.578
       ],
-      "featureCount": 11,
+      "featureCount": 12,
       "byKind": {
+        "floor-shell": 1,
         "wall": 10,
         "door": 1
       },
       "byZoomBand": {
-        "overview": 10,
-        "standard": 10,
-        "detail": 11
+        "overview": 11,
+        "standard": 11,
+        "detail": 12
       },
       "extractionMode": "horizontal-section",
       "order": 8,

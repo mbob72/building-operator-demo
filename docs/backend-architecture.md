@@ -1,7 +1,7 @@
 # Backend architecture
 
 - Актуально на: 2026-08-09
-- Текущий этап: Stage 4, реализован, ожидает приёмки
+- Текущий этап: Stage 4, принят 2026-08-09
 - Назначение: живое описание реализованного backend; обновляется при каждом этапе и существенном изменении API, хранения или runtime topology.
 
 ## Роль backend
@@ -77,6 +77,8 @@ Render запускает один Node service и проверяет `/api/heal
 4. проверяет соответствие floor ID;
 5. сохраняет упорядоченные summaries и `Map<floorId, scene>`.
 
+Каждый prepared scene dataset `west-riverside-stage-2-v2` содержит один сгенерированный convex-hull `floor-shell`. `PreparedSceneSchema` требует видимость shell во всём диапазоне `[-8, 24]` и покрытие bbox всех остальных features. Pipeline validator дополнительно требует ровно один shell и ненулевой count в каждом LOD band.
+
 Все подготовленные scenes вместе занимают около 1,2 МБ. Они загружаются один раз при старте. `sceneDatasetVersion` берётся из floor index.
 
 ### Device catalog repository
@@ -116,6 +118,8 @@ Snapshot валидируется целиком через `StateSnapshotSchema
 ```
 
 `SceneQuerySchema` валидирует body. Repository находит этаж, после чего backend оставляет features, пересекающие bbox и удовлетворяющие `minZoom <= zoom <= maxZoom`. Bands: `overview < 1.7`, `standard < 4.1`, иначе `detail`. `sceneVersion` объединяет dataset version и floor ID. Устройств в ответе нет.
+
+`meta.emptyReason` равен `null` для непустого ответа. Для успешного пустого ответа он различает `viewport-outside-floor`, `no-spatial-features` и `lod-filtered`; transport error этим полем не маскируется. Благодаря full-range shell валидный viewport с архитектурными spatial candidates не становится пустым только из-за LOD.
 
 ### `GET /api/v1/catalog`
 
@@ -162,6 +166,8 @@ API coverage проверяет:
 - список и порядок восьми этажей;
 - scene query другого этажа и dataset-aware version;
 - viewport/zoom filtering;
+- обязательный full-range `floor-shell` во всех восьми full-floor overview responses;
+- empty reason для outside/no-spatial/LOD-filtered случаев;
 - одиночный и повторяемый floor scope каталога;
 - отсутствие status в stable metadata;
 - deterministic snapshot на 2 900 и 18 000 records;

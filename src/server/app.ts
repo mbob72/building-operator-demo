@@ -4,21 +4,16 @@ import fastifyStatic from '@fastify/static';
 import { createHash } from 'node:crypto';
 import { resolve } from 'node:path';
 import { CatalogQuerySchema, StateSnapshotQuerySchema } from '../shared/api-contracts.js';
-import { SceneQuerySchema, type BBox, type SceneFeature } from '../shared/scene-contracts.js';
+import { SceneQuerySchema } from '../shared/scene-contracts.js';
 import { deviceCatalog, selectCatalogFloors } from './device-catalog.js';
 import { findScene, floors, sceneDatasetVersion } from './scene-repository.js';
+import { selectSceneFeatures } from './scene-selection.js';
 import { selectSnapshotFloors } from './state-snapshot.js';
 
 interface AppOptions {
   serveStatic?: boolean;
   staticRoot?: string;
 }
-
-const intersects = (a: BBox, b: BBox) =>
-  a[0] <= b[2] && a[2] >= b[0] && a[1] <= b[3] && a[3] >= b[1];
-
-const isVisibleAtZoom = (feature: SceneFeature, zoom: number) =>
-  feature.minZoom <= zoom && feature.maxZoom >= zoom;
 
 const zoomBand = (zoom: number) => {
   if (zoom < 1.7) return 'overview' as const;
@@ -105,9 +100,11 @@ export const buildApp = (options: AppOptions = {}) => {
       return reply.status(404).send({ error: 'floor_not_found' });
     }
 
-    const features = record.scene.features.filter(
-      (feature) => intersects(feature.bbox, parsed.data.viewport.bbox)
-        && isVisibleAtZoom(feature, parsed.data.zoom),
+    const selection = selectSceneFeatures(
+      record.scene.features,
+      record.floor.bounds,
+      parsed.data.viewport.bbox,
+      parsed.data.zoom,
     );
 
     return {
@@ -116,10 +113,11 @@ export const buildApp = (options: AppOptions = {}) => {
       floor: record.floor,
       request: parsed.data,
       zoomBand: zoomBand(parsed.data.zoom),
-      features,
+      features: selection.features,
       meta: {
         totalFeatures: record.scene.features.length,
-        returnedFeatures: features.length,
+        returnedFeatures: selection.features.length,
+        emptyReason: selection.emptyReason,
       },
     };
   });
