@@ -3,6 +3,7 @@ import type { DeviceMetadata } from '../../shared/domain-contracts';
 import type { FloorSummary } from '../../shared/scene-contracts';
 import { filterAndSortAlarms } from './alarm-model';
 import { DeviceMarkerStrip } from './DeviceVisualMarkers';
+import { CommandControls } from './CommandControls';
 import { useDeviceTelemetry, useRealtimeSelector } from './use-realtime-state';
 
 interface DeviceCardProps {
@@ -21,12 +22,16 @@ const formatValue = (value: boolean | number | string | null): string => {
 export const DeviceCard = ({ device, floors, onClose }: DeviceCardProps) => {
   const telemetry = useDeviceTelemetry(device.id);
   const alarmsById = useRealtimeSelector((snapshot) => snapshot.alarmsById);
+  const commandsById = useRealtimeSelector((snapshot) => snapshot.commandsById);
   const floorName = floors.find((floor) => floor.id === device.floorId)?.name ?? device.floorId;
   const channels = Object.entries(telemetry?.values ?? {}).slice(0, 4);
   const alarms = useMemo(() => filterAndSortAlarms(
     [...alarmsById.values()].filter((alarm) => alarm.deviceId === device.id),
     { severity: 'all', state: 'all' },
   ), [alarmsById, device.id]);
+  const commands = useMemo(() => [...commandsById.values()].filter(
+    (command) => command.deviceId === device.id,
+  ), [commandsById, device.id]);
 
   return (
     <aside className="device-card" aria-label="Selected device">
@@ -71,6 +76,7 @@ export const DeviceCard = ({ device, floors, onClose }: DeviceCardProps) => {
           ))}
         </div>
       )}
+      <CommandControls device={device} telemetry={telemetry} commands={commands} />
       <p className="device-card__id">{device.id}</p>
     </aside>
   );

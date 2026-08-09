@@ -8,6 +8,9 @@ import {
   AcknowledgeAlarmRequestSchema,
   AcknowledgeAlarmResponseSchema,
   CatalogQuerySchema,
+  CommandResponseSchema,
+  CreateCommandRequestSchema,
+  CreateCommandResponseSchema,
   StateSnapshotQuerySchema,
 } from '../shared/api-contracts.js';
 import { SceneQuerySchema } from '../shared/scene-contracts.js';
@@ -129,6 +132,43 @@ export const buildApp = (options: AppOptions = {}) => {
 
     reply.header('cache-control', 'no-store');
     return AcknowledgeAlarmResponseSchema.parse({ alarm: result.alarm });
+  });
+
+  app.post('/api/v1/commands', async (request, reply) => {
+    const parsed = CreateCommandRequestSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(400).send({
+        error: 'invalid_command_request',
+        details: parsed.error.issues,
+      });
+    }
+    const result = realtimeEngine.createCommand(parsed.data);
+    if (result.status === 'device-not-found') {
+      return reply.status(404).send({ error: 'command_device_not_found' });
+    }
+    if (result.status === 'idempotency-conflict') {
+      return reply.status(409).send({
+        error: 'command_idempotency_conflict',
+        command: result.command,
+      });
+    }
+    if (result.status !== 'created') {
+      return reply.status(422).send({
+        error: result.status,
+        ...('capability' in result ? { capability: result.capability } : {}),
+      });
+    }
+    reply.header('cache-control', 'no-store');
+    return CreateCommandResponseSchema.parse({ command: result.command });
+  });
+
+  app.get('/api/v1/commands/:commandId', async (request, reply) => {
+    const { commandId } = request.params as { commandId?: string };
+    if (!commandId) return reply.status(400).send({ error: 'invalid_command_id' });
+    const command = realtimeEngine.getCommand(commandId);
+    if (!command) return reply.status(404).send({ error: 'command_not_found' });
+    reply.header('cache-control', 'no-store');
+    return CommandResponseSchema.parse({ command });
   });
 
   app.post('/api/scene/query', async (request, reply) => {

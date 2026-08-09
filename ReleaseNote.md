@@ -2,8 +2,8 @@
 
 ## Текущий статус
 
-- Текущий статус: **этап 6 завершён и принят; этап 7 не начат**.
-- Этапы 0–6 завершены и приняты.
+- Текущий статус: **этап 7 завершён и принят; этап 8 не начат**.
+- Этапы 0–7 завершены и приняты.
 - Разработка ведётся последовательно одним coding agent.
 - Переход между этапами выполняется только после явного апрува пользователя.
 - Количество устройств не является строгой константой `20 000`: нужен репрезентативный набор порядка десятков тысяч, без ухода в игрушечный масштаб около 2 000 или избыточный масштаб около 200 000.
@@ -78,14 +78,16 @@
 
 Реализованы deterministic warning/critical alarm fixtures на восьми этажах, монотонный lifecycle `active → acknowledged → resolved`, idempotent acknowledge REST mutation и `alarm.upsert` в общем realtime stream. Frontend получил building-wide alarm panel, severity/state filters, active counter, переход к устройству, audit author/time, карточку alarms и отдельный instanced plan contour, независимый от telemetry status и device filters. После UX-корректировок `Alarms` стоит первым, device filters представлены тремя multi-select checkbox-рядами с tri-state master controls, а scene использует единственный hover-tooltip и отдельный selection halo без массовых device labels. Все 19 device types имеют уникальные SVG-atlas glyphs; карта, фильтры, строки аварий и карточка выбранного устройства используют единый type mapping, protocol badges и цветные telemetry-status squares. Полный отчёт: `reports/stage-six.md`.
 
-### Этап 7. Управляющие команды
+### Этап 7. Управляющие команды — завершён и принят
 
 - Включение/выключение и изменение setpoint.
 - Confirmation dialog для потенциально критичных команд.
 - Состояния `draft`, `pending`, `accepted`, `executed`, `failed`, `timedOut`.
 - Раздельное отображение желаемого состояния, backend-подтверждения и фактической телеметрии.
 
-### Этап 8. Надёжность и граничные сценарии
+Реализованы capability-driven on/off и setpoint drafts, обязательный confirmation dialog для помеченных критичными capabilities, идемпотентный `POST /api/v1/commands` и lookup fallback. In-memory simulator публикует полные records по цепочке `pending → accepted → executed | failed | timedOut` в общем ordered stream. После `executed` отдельный delayed telemetry patch синтетически подтверждает requested on/off или setpoint; `failed`/`timedOut` telemetry не меняют. Карточка явно разделяет draft desired intent, backend lifecycle и actual telemetry, поэтому convergence видна как отдельное событие. Полный отчёт: `reports/stage-seven.md`.
+
+### Этап 8. Надёжность и граничные сценарии — не начат
 
 - Дублированные, устаревшие и пропущенные сообщения.
 - Команды во время disconnect.

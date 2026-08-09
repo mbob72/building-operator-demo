@@ -9,7 +9,7 @@ Browser
   -> Render HTTPS origin
        -> Fastify API (/api/*)
        -> Vite production files (/*)
-       -> future WebSocket simulator (/ws)
+       -> WebSocket simulator (/api/v1/realtime)
 ```
 
 The service is configured by `render.yaml`. GitHub Actions must pass before Render deploys a commit.
@@ -46,16 +46,16 @@ Open <http://127.0.0.1:4174>.
 3. Select the root `render.yaml`.
 4. Confirm the service name and free/paid plan.
 5. Allow the first deployment to wait for GitHub checks.
-6. Verify `/api/health`, `/api/floors`, `/api/scene/query`, and the browser viewer.
+6. Verify `/api/health`, `/api/floors`, `/api/scene/query`, `/api/v1/state/snapshot`, `/api/v1/realtime`, command creation, and the browser viewer.
 
-No secret environment variables are required for Stage 0.
+No secret environment variables are required for the current Stage 7 demo.
 
 ## Demo safety
 
 - Deploy only public, attributed, or synthetic data.
 - Never add KNX, DALI, Modbus, BACnet, or other physical-system credentials.
 - Keep command execution simulated.
-- Mark the UI as a demo before command controls are introduced.
+- Keep the visible `OPERATOR DEMO` marker while simulated command controls are available.
 - Treat the Render filesystem and in-memory simulator state as ephemeral.
 
 ## Operational limitations

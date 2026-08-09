@@ -1,10 +1,13 @@
 import { randomUUID } from 'node:crypto';
 import {
   AlarmSchema,
+  CommandRecordSchema,
   DeviceTelemetryPatchSchema,
   DeviceTelemetrySchema,
   type Alarm,
   type CommandRecord,
+  type CommandIntent,
+  type DeviceMetadata,
   type DeviceTelemetry,
   type DeviceTelemetryPatch,
   type TelemetryScalar,
@@ -12,6 +15,7 @@ import {
 import {
   StateSnapshotSchema,
   type AcknowledgeAlarmRequest,
+  type CreateCommandRequest,
   type StateSnapshot,
 } from '../shared/api-contracts.js';
 import {
@@ -38,7 +42,26 @@ interface RealtimeEngineOptions {
   streamId?: string;
   replayLimit?: number;
   now?: () => Date;
+  commandAcceptanceDelayMs?: number;
+  commandCompletionDelayMs?: number;
+  commandTelemetryDelayMs?: number;
+  commandOutcome?: (request: CreateCommandRequest) => 'executed' | 'failed' | 'timedOut';
 }
+
+const DEFAULT_COMMAND_ACCEPTANCE_DELAY_MS = 350;
+const DEFAULT_COMMAND_COMPLETION_DELAY_MS = 1_200;
+const DEFAULT_COMMAND_TELEMETRY_DELAY_MS = 650;
+
+const telemetryKeyForIntent = (device: DeviceMetadata, intent: CommandIntent) => {
+  const channels = device.capabilities.telemetry;
+  if (intent.kind === 'setOnOff') {
+    return channels.find((channel) => channel.key === 'on' && channel.valueType === 'boolean')?.key
+      ?? channels.find((channel) => channel.valueType === 'boolean')?.key;
+  }
+  return channels.find((channel) => channel.key === 'setpoint' && channel.valueType === 'number')?.key
+    ?? channels.find((channel) => channel.key === 'level' && channel.valueType === 'number')?.key
+    ?? channels.find((channel) => channel.valueType === 'number')?.key;
+};
 
 const nextValue = (value: TelemetryScalar, revision: number): TelemetryScalar => {
   if (typeof value === 'boolean') return !value;
@@ -71,11 +94,18 @@ export class RealtimeEngine {
   readonly streamId: string;
   readonly replayLimit: number;
   private readonly now: () => Date;
+  private readonly commandAcceptanceDelayMs: number;
+  private readonly commandCompletionDelayMs: number;
+  private readonly commandTelemetryDelayMs: number;
+  private readonly commandOutcome: NonNullable<RealtimeEngineOptions['commandOutcome']>;
   private readonly telemetryByDeviceId: Map<string, DeviceTelemetry>;
   private readonly alarmsById = new Map<string, Alarm>(
     initialAlarms.map((alarm) => [alarm.id, alarm]),
   );
   private readonly commandsById = new Map<string, CommandRecord>();
+  private readonly commandIdByClientRequestId = new Map<string, string>();
+  private readonly commandRequestByClientRequestId = new Map<string, CreateCommandRequest>();
+  private readonly commandTimers = new Set<ReturnType<typeof setTimeout>>();
   private readonly listeners = new Set<RealtimeListener>();
   private replay: SequencedRealtimeEvent[] = [];
   private sequence = 0;
@@ -83,9 +113,22 @@ export class RealtimeEngine {
   private simulatorTimer: ReturnType<typeof setInterval> | undefined;
 
   constructor(options: RealtimeEngineOptions = {}) {
-    this.streamId = options.streamId ?? `stage-6-${randomUUID()}`;
+    this.streamId = options.streamId ?? `stage-7-${randomUUID()}`;
     this.replayLimit = options.replayLimit ?? REALTIME_REPLAY_LIMIT;
     this.now = options.now ?? (() => new Date());
+    this.commandAcceptanceDelayMs = options.commandAcceptanceDelayMs
+      ?? DEFAULT_COMMAND_ACCEPTANCE_DELAY_MS;
+    this.commandCompletionDelayMs = options.commandCompletionDelayMs
+      ?? DEFAULT_COMMAND_COMPLETION_DELAY_MS;
+    this.commandTelemetryDelayMs = options.commandTelemetryDelayMs
+      ?? DEFAULT_COMMAND_TELEMETRY_DELAY_MS;
+    let commandOrdinal = 0;
+    this.commandOutcome = options.commandOutcome ?? (() => {
+      commandOrdinal += 1;
+      if (commandOrdinal % 10 === 9) return 'failed';
+      if (commandOrdinal % 10 === 0) return 'timedOut';
+      return 'executed';
+    });
     this.telemetryByDeviceId = new Map(initialTelemetry.map((item) => [item.deviceId, item]));
   }
 
@@ -105,6 +148,10 @@ export class RealtimeEngine {
     return this.alarmsById.get(alarmId);
   }
 
+  getCommand(commandId: string) {
+    return this.commandsById.get(commandId);
+  }
+
   snapshot(floorIds: readonly string[]): StateSnapshot {
     const selectedFloorIds = new Set(floorIds);
     const telemetry = [...this.telemetryByDeviceId.values()].filter((item) => {
@@ -113,7 +160,7 @@ export class RealtimeEngine {
     });
     const selectedDeviceIds = new Set(telemetry.map((item) => item.deviceId));
     return StateSnapshotSchema.parse({
-      snapshotId: `stage-6-live-snapshot-v1:${this.sequence}:${scopeIdFor(floorIds)}`,
+      snapshotId: `stage-7-live-snapshot-v1:${this.sequence}:${scopeIdFor(floorIds)}`,
       buildingId: deviceCatalog.building.id,
       streamId: this.streamId,
       sequence: this.sequence,
@@ -217,6 +264,126 @@ export class RealtimeEngine {
     return { status: 'acknowledged' as const, alarm };
   }
 
+  private publishCommand(command: CommandRecord) {
+    const parsed = CommandRecordSchema.parse(command);
+    this.commandsById.set(parsed.id, parsed);
+    this.publishEvents([{ type: 'command.upsert', payload: parsed }]);
+    return parsed;
+  }
+
+  private scheduleCommandTransition(delayMs: number, transition: () => void) {
+    const timer = setTimeout(() => {
+      this.commandTimers.delete(timer);
+      transition();
+    }, delayMs);
+    timer.unref?.();
+    this.commandTimers.add(timer);
+  }
+
+  createCommand(request: CreateCommandRequest) {
+    const existingId = this.commandIdByClientRequestId.get(request.clientRequestId);
+    if (existingId) {
+      const existing = this.commandsById.get(existingId)!;
+      const originalRequest = this.commandRequestByClientRequestId.get(request.clientRequestId);
+      return JSON.stringify(originalRequest) === JSON.stringify(request)
+        ? { status: 'created' as const, command: existing }
+        : { status: 'idempotency-conflict' as const, command: existing };
+    }
+
+    const device = deviceCatalog.devices.find((item) => item.id === request.deviceId);
+    if (!device) return { status: 'device-not-found' as const };
+    const capability = device.capabilities.commands.find((item) => item.kind === request.intent.kind);
+    if (!capability) return { status: 'unsupported-command' as const };
+    if (capability.kind === 'setSetpoint' && request.intent.kind === 'setSetpoint') {
+      const { value } = request.intent;
+      const alignedSteps = (value - capability.minimum) / capability.step;
+      if (value < capability.minimum
+        || value > capability.maximum
+        || Math.abs(alignedSteps - Math.round(alignedSteps)) > 1e-8) {
+        return { status: 'invalid-setpoint' as const, capability };
+      }
+    }
+    if (capability.requiresConfirmation && request.confirmation === null) {
+      return { status: 'confirmation-required' as const };
+    }
+    if (request.confirmation
+      && (request.confirmation.confirmedBy !== request.requestedBy
+        || Date.parse(request.confirmation.confirmedAt) < Date.parse(request.requestedAt))) {
+      return { status: 'invalid-confirmation' as const };
+    }
+
+    const command = CommandRecordSchema.parse({
+      id: `command-${randomUUID()}`,
+      ...request,
+      state: 'pending',
+      acceptedAt: null,
+      executedAt: null,
+      failedAt: null,
+      timedOutAt: null,
+      failure: null,
+      resultTelemetryRevision: null,
+    });
+    this.commandIdByClientRequestId.set(request.clientRequestId, command.id);
+    this.commandRequestByClientRequestId.set(request.clientRequestId, request);
+    this.publishCommand(command);
+
+    this.scheduleCommandTransition(this.commandAcceptanceDelayMs, () => {
+      const current = this.commandsById.get(command.id);
+      if (!current || current.state !== 'pending') return;
+      const accepted = this.publishCommand({
+        ...current,
+        state: 'accepted',
+        acceptedAt: this.now().toISOString(),
+      });
+      this.scheduleCommandTransition(this.commandCompletionDelayMs, () => {
+        const latest = this.commandsById.get(command.id);
+        if (!latest || latest.state !== 'accepted') return;
+        const timestamp = this.now().toISOString();
+        const outcome = this.commandOutcome(request);
+        if (outcome === 'executed') {
+          this.publishCommand({
+            ...latest,
+            state: 'executed',
+            executedAt: timestamp,
+            resultTelemetryRevision: null,
+          });
+          this.scheduleCommandTransition(this.commandTelemetryDelayMs, () => {
+            const executed = this.commandsById.get(command.id);
+            const telemetry = this.telemetryByDeviceId.get(command.deviceId);
+            if (!executed || executed.state !== 'executed' || !telemetry) return;
+            const telemetryKey = telemetryKeyForIntent(device, request.intent);
+            if (!telemetryKey) return;
+            const revision = telemetry.revision + 1;
+            const telemetryTimestamp = this.now().toISOString();
+            const patch = this.publishTelemetryPatches([{
+              deviceId: command.deviceId,
+              revision,
+              observedAt: telemetryTimestamp,
+              receivedAt: telemetryTimestamp,
+              values: { [telemetryKey]: request.intent.value },
+            }]);
+            if (!patch) return;
+            this.publishCommand({ ...executed, resultTelemetryRevision: revision });
+          });
+        } else if (outcome === 'failed') {
+          this.publishCommand({
+            ...accepted,
+            state: 'failed',
+            failedAt: timestamp,
+            failure: {
+              code: 'SIMULATED_EXECUTION_FAILED',
+              message: 'The simulated controller rejected command execution',
+            },
+          });
+        } else {
+          this.publishCommand({ ...accepted, state: 'timedOut', timedOutAt: timestamp });
+        }
+      });
+    });
+
+    return { status: 'created' as const, command };
+  }
+
   generateSimulatorBatch(batchSize = REALTIME_SIMULATOR_BATCH_SIZE) {
     const patches: DeviceTelemetryPatch[] = [];
     for (let offset = 0; offset < batchSize; offset += 1) {
@@ -259,8 +426,11 @@ export class RealtimeEngine {
   }
 
   stopSimulator() {
-    if (!this.simulatorTimer) return;
-    clearInterval(this.simulatorTimer);
-    this.simulatorTimer = undefined;
+    if (this.simulatorTimer) {
+      clearInterval(this.simulatorTimer);
+      this.simulatorTimer = undefined;
+    }
+    for (const timer of this.commandTimers) clearTimeout(timer);
+    this.commandTimers.clear();
   }
 }

@@ -2,6 +2,9 @@
 
 Незакрытые межэтапные архитектурные риски и критерии их закрытия ведутся отдельно в [`architecture-todo.md`](architecture-todo.md).
 
+- Актуально на: 2026-08-10
+- Текущий статус: Stage 7 завершён и принят; Stage 8 не начат.
+
 ## System boundaries
 
 ```mermaid
@@ -27,6 +30,7 @@ flowchart LR
         SnapshotAPI["GET /api/v1/state/snapshot"]
         RealtimeAPI["WS /api/v1/realtime"]
         AckAPI["POST alarm acknowledge"]
+        CommandAPI["POST/GET commands"]
 
         SceneRepo --> FloorsAPI
         SceneRepo --> SceneAPI
@@ -35,6 +39,7 @@ flowchart LR
         RealtimeEngine --> SnapshotAPI
         RealtimeEngine --> RealtimeAPI
         RealtimeEngine --> AckAPI
+        RealtimeEngine --> CommandAPI
     end
 
     subgraph Frontend["React frontend"]
@@ -46,6 +51,7 @@ flowchart LR
         Deck["deck.gl layers"]
         Card["Selected DeviceCard"]
         AlarmPanel["AlarmPanel"]
+        CommandControls["CommandControls"]
 
         Query --> Workspace
         Store --> Workspace
@@ -55,6 +61,8 @@ flowchart LR
         Renderers --> Card
         Hot --> AlarmPanel
         Store --> AlarmPanel
+        Hot --> CommandControls
+        Store --> CommandControls
     end
 
     Scenes --> SceneRepo
@@ -64,6 +72,7 @@ flowchart LR
     SnapshotAPI --> Hot
     RealtimeAPI --> Hot
     AlarmPanel --> AckAPI
+    CommandControls --> CommandAPI
     SceneAPI --> Renderers
 ```
 
@@ -177,3 +186,11 @@ Frontend alarm filters/panel state belongs to Zustand, alarm records belong to `
 Device names также не создаются как массовые `TextLayer` labels на detail zoom. Deck picking владеет единственным hover-tooltip, а текущий `selectedDeviceId` визуализируется отдельным fixed-pixel halo; selection остаётся заметным без засорения карты текстом.
 
 Device type visual identity имеет строгое соответствие 1:1 с `DeviceTypeSchema`: все 19 contract types занимают отдельные slots общего SVG atlas. deck.gl layers, toolbar filters, alarm rows и selected-device card используют один `deviceIconOrder`/`iconMapping`; отдельные component-level таблицы соответствий запрещены, чтобы тип не менял glyph между картой и UI.
+
+## Stage 7 implementation boundary
+
+Stage 7 activates command contracts without coupling desired state to telemetry. `CommandDraft` lives only in Zustand and is rebuilt from the selected device capability. Submission validates capability kind, setpoint range/step, confirmation audit fields and `clientRequestId`; backend records always begin at `pending`.
+
+The in-memory simulator publishes complete `command.upsert` records through the existing building sequence: `pending → accepted → executed | failed | timedOut`. The HTTP create response is reconciled into `commandsById` without moving the realtime cursor, and lifecycle rank prevents a slow `pending` response from replacing an already received `accepted` record.
+
+Only after `executed`, a separate delayed `telemetry.patch` updates the declared boolean/setpoint channel through the normal revisioned telemetry path. A following complete `command.upsert` records that applied revision in `resultTelemetryRevision`. Thus desired state, backend acceptance and actual telemetry remain separate events and stores even when the demo converges them; failed/timed-out commands never emit convergence telemetry.

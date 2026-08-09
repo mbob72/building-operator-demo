@@ -1,11 +1,14 @@
 import {
   AcknowledgeAlarmResponseSchema,
   CatalogResponseSchema,
+  CommandResponseSchema,
+  CreateCommandResponseSchema,
   StateSnapshotSchema,
   type AcknowledgeAlarmRequest,
+  type CreateCommandRequest,
   type StateSnapshot,
 } from '../../shared/api-contracts';
-import type { Alarm, DeviceCatalog } from '../../shared/domain-contracts';
+import type { Alarm, CommandRecord, DeviceCatalog } from '../../shared/domain-contracts';
 
 const scopeParameters = (floorIds?: string[]): URLSearchParams => {
   const parameters = new URLSearchParams({ buildingId: 'west-riverside' });
@@ -57,4 +60,20 @@ export const acknowledgeAlarm = async (
   });
   if (!response.ok) throw new Error(`Alarm acknowledgement failed: ${response.status}`);
   return AcknowledgeAlarmResponseSchema.parse(await response.json()).alarm;
+};
+
+export const createCommand = async (request: CreateCommandRequest): Promise<CommandRecord> => {
+  const response = await fetch('/api/v1/commands', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(request),
+  });
+  if (!response.ok) throw new Error(`Command request failed: ${response.status}`);
+  return CreateCommandResponseSchema.parse(await response.json()).command;
+};
+
+export const loadCommand = async (commandId: string): Promise<CommandRecord> => {
+  const response = await fetch(`/api/v1/commands/${encodeURIComponent(commandId)}`);
+  if (!response.ok) throw new Error(`Command status request failed: ${response.status}`);
+  return CommandResponseSchema.parse(await response.json()).command;
 };

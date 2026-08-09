@@ -2,8 +2,8 @@
 
 Внутренняя работа и граница ответственности двух realtime-классов подробно описана в [`realtime-client-and-hot-store.md`](realtime-client-and-hot-store.md).
 
-- Актуально на: 2026-08-09
-- Текущий статус: Stage 6 завершён и принят; Stage 7 не начат
+- Актуально на: 2026-08-10
+- Текущий статус: Stage 7 завершён и принят; Stage 8 не начат
 - Назначение: пошаговое описание пути данных от HTTP/WebSocket до React-компонентов и deck.gl layers.
 
 ## Итоговая схема
@@ -26,11 +26,17 @@ WS /api/v1/realtime ─────────┘       │
                                      ├→ renderer status selectors
                                      ├→ toolbar cursor selector
                                      ├→ selected-device telemetry/alarm selectors
+                                     ├→ selected-device command selector
                                      └→ AlarmPanel + alarm plan layer
 
 POST /api/v1/alarms/:id/acknowledge
         → validated Alarm response
         → hot-store reconciliation (cursor unchanged)
+
+POST /api/v1/commands
+        → validated pending CommandRecord
+        → hot-store reconciliation (cursor unchanged)
+        ← later sequenced command.upsert lifecycle
 ```
 
 Geometry, stable metadata, hot operational state и UI-only state не объединяются в один transport document или общий frontend store.
@@ -42,7 +48,7 @@ Geometry, stable metadata, hot operational state и UI-only state не объе�
 | Floors, stable catalog, overview scene bands | TanStack Query | стабильные или повторно используемые серверные документы |
 | Authoritative snapshot и live operational state | `RealtimeHotStore` | единый актуальный indexed state без stale query-cache копии |
 | Realtime connection, resume, replay и resync | `RealtimeClient` | transport lifecycle не является React server-state query |
-| Mode, selected floor/device, search/device/alarm filters и panel state | Zustand `operator-store` | UI-only state |
+| Mode, selected floor/device, search/device/alarm filters, panel state и command draft | Zustand `operator-store` | UI-only state |
 | Camera, viewport и текущие deck.gl layers | renderer hooks/components | локальное высокочастотное состояние визуализации |
 
 ## 1. HTTP-клиенты
@@ -53,6 +59,8 @@ Geometry, stable metadata, hot operational state и UI-only state не объе�
 - [`loadStateSnapshot(floorIds, signal)`](../src/client/src/operator-api.ts#L28) вызывает `GET /api/v1/state/snapshot` для bootstrap;
 - [`loadStateSnapshotPath(path, signal)`](../src/client/src/operator-api.ts#L40) загружает snapshot по пути из `resync.required`.
 - [`acknowledgeAlarm(alarmId, request)`](../src/client/src/operator-api.ts) вызывает mutation endpoint и валидирует `AcknowledgeAlarmResponse`.
+- [`createCommand(request)`](../src/client/src/operator-api.ts) отправляет idempotent mutation и валидирует `CreateCommandResponse`;
+- [`loadCommand(commandId)`](../src/client/src/operator-api.ts) предоставляет GET fallback для Stage 8 disconnect handling.
 
 Каждый JSON-ответ проходит runtime Zod parsing через `CatalogResponseSchema` или `StateSnapshotSchema`. Невалидный payload не попадает в query cache или hot store.
 
@@ -65,7 +73,7 @@ queryKey: ['device-catalog', scope]
 staleTime: 5 * 60_000
 ```
 
-Stage 6 использует building scope в обоих режимах. Выбранный floor вычисляется локально, поэтому alarm navigation не ждёт metadata request. Pan, zoom, telemetry и alarm events не перезапрашивают catalog. `catalog.invalidated` из realtime stream вызывает `invalidateQueries({ queryKey: ['device-catalog'] })`.
+Stage 7 использует building scope в обоих режимах. Выбранный floor вычисляется локально, поэтому alarm navigation не ждёт metadata request. Pan, zoom, telemetry, alarm и command events не перезапрашивают catalog. `catalog.invalidated` из realtime stream вызывает `invalidateQueries({ queryKey: ['device-catalog'] })`.
 
 Operational snapshot намеренно не имеет TanStack query key. Удалённый `useStateSnapshotQuery` создавал бессрочно кешированную копию, которая устаревала сразу после первого WebSocket batch.
 
@@ -128,7 +136,7 @@ Store также сохраняет:
   "type": "resume",
   "protocolVersion": "1",
   "buildingId": "west-riverside",
-  "streamId": "stage-6-…",
+  "streamId": "stage-7-…",
   "afterSequence": 1200
 }
 ```
@@ -156,7 +164,23 @@ Snapshot indexing and `alarm.upsert` both replace a complete record in `alarmsBy
 
 Renderer получает полный scoped список устройств отдельно от `filteredDevices`. [`alarm-layers.ts`](../src/client/src/alarm-layers.ts) создаёт один `ScatterplotLayer` unresolved contours; resolved records остаются в списке/карточке, но не на плане. `Locate` соединяет alarm `deviceId` с building catalog и атомарно обновляет Zustand floor/selection. Выбранная [`DeviceCard`](../src/client/src/DeviceCard.tsx) использует тот же marker strip, но status получает из своего точечного telemetry selector.
 
-## 9. Recovery
+## 9. Command lifecycle consumption
+
+`DeviceCard` выбирает только commands текущего `deviceId` из `commandsById`. [`CommandControls`](../src/client/src/CommandControls.tsx) строит UI-only `CommandDraft` из stable capability и хранит его в Zustand; backend никогда не получает или не возвращает state `draft`.
+
+Submission выполняется напрямую или после explicit confirmation dialog. Schema-valid REST response reconciles через `upsertCommand()` без изменения cursor. Если ordered `accepted` уже пришёл раньше более медленного HTTP `pending`, lifecycle rank сохраняет более новый record. Последующие complete `command.upsert` применяются обычным batch path.
+
+В command form/history три значения не мержатся:
+
+```text
+desired intent     ← Zustand draft / immutable CommandRecord.intent
+backend lifecycle ← commandsById
+actual telemetry  ← telemetryByDeviceId
+```
+
+Поэтому `executed` не подменяет actual value. В Stage 7 simulator позже публикует отдельный revisioned telemetry patch для успешной команды, после которого selector обновляет `Actual`; failed/timedOut records не вызывают такого события. Setpoint input получает range/step из capability, а server повторно валидирует их независимо от HTML controls.
+
+## 10. Recovery
 
 Кратковременный disconnect вызывает [`scheduleReconnect()`](../src/client/src/realtime-client.ts#L158) с [exponential backoff 250–5 000 мс](../src/client/src/realtime-client.ts#L165), после чего client снова отправляет последний cursor. Доступные события приходят из replay.
 

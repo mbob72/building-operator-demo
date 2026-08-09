@@ -169,6 +169,10 @@ describe('operator domain contracts', () => {
     expect(CommandRecordSchema.parse(command).state).toBe('pending');
     expect(CommandRecordSchema.safeParse({ ...command, state: 'draft' }).success).toBe(false);
     expect(CommandRecordSchema.safeParse({ ...command, state: 'executed' }).success).toBe(false);
+    expect(CommandRecordSchema.safeParse({
+      ...command,
+      failedAt: timestamp,
+    }).success).toBe(false);
   });
 
   it('validates an authoritative state snapshot', () => {

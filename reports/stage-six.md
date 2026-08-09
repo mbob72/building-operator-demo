@@ -83,6 +83,6 @@ resolved ─X→ active
 - Один low-volume alarm layer пересобирается целиком при alarm change; dirty ranges для него преждевременны.
 - Production logging, database, authorization и multi-instance synchronization остаются вне текущего MVP.
 
-## Граница следующего этапа
+## Post-stage status
 
-Stage 7 может начаться только после явной приёмки Stage 6. Он должен добавить simulated command lifecycle в отдельный `commandsById`/`command.upsert`, не используя Alarm или telemetry status как desired command state.
+Stage 7 завершён и принят 2026-08-10. Он добавил simulated command lifecycle в отдельный `commandsById`/`command.upsert`, не используя Alarm или telemetry status как desired command state. Историческая граница Stage 6 сохранена; текущий отчёт Stage 7 находится в `reports/stage-seven.md`.

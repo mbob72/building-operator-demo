@@ -1,5 +1,6 @@
 import type {
   Alarm,
+  CommandRecord,
   DeviceMetadata,
   DeviceStatus,
   DeviceTelemetry,
@@ -61,5 +62,27 @@ export const makeAlarm = (
   acknowledgedAt: null,
   acknowledgedBy: null,
   resolvedAt: null,
+  ...overrides,
+});
+
+export const makeCommand = (
+  id: string,
+  deviceId: string,
+  overrides: Partial<CommandRecord> = {},
+): CommandRecord => ({
+  id,
+  clientRequestId: `request-${id}`,
+  deviceId,
+  intent: { kind: 'setOnOff', value: false },
+  state: 'pending',
+  requestedAt: '2026-08-09T12:00:00.000Z',
+  requestedBy: 'demo-operator',
+  confirmation: null,
+  acceptedAt: null,
+  executedAt: null,
+  failedAt: null,
+  timedOutAt: null,
+  failure: null,
+  resultTelemetryRevision: null,
   ...overrides,
 });

@@ -1,6 +1,8 @@
 # Building operator MVP
 
-Stage 0 proves viewport-aware scene delivery for real West Riverside Hospital geometry. Stage 1 defines product and operational contracts. Stage 2 adds eight architectural floors, a representative 18,000-device catalog, and a 50,000-device stress fixture. Stage 3 renders a one-floor device slice. Stage 4 adds floor/building modes, filters and renderer LOD. Stage 5 adds an authoritative snapshot, ordered WebSocket telemetry, replay/resync, selective hot-state subscriptions and dirty GPU updates. Stage 6 adds alarm lifecycle, acknowledge/locate workflow and a consistent device visual language with one unique atlas glyph for each of the 19 contract device types.
+Stage 0 proves viewport-aware scene delivery for real West Riverside Hospital geometry. Stage 1 defines product and operational contracts. Stage 2 adds eight architectural floors, a representative 18,000-device catalog, and a 50,000-device stress fixture. Stage 3 renders a one-floor device slice. Stage 4 adds floor/building modes, filters and renderer LOD. Stage 5 adds an authoritative snapshot, ordered WebSocket telemetry, replay/resync, selective hot-state subscriptions and dirty GPU updates. Stage 6 adds alarm lifecycle and the shared 19-type visual language. Stage 7 adds idempotent simulated commands, confirmation for critical capabilities, realtime lifecycle, and explicit desired/backend/actual state separation.
+
+Current status: Stage 7 is complete and accepted; Stage 8 has not started.
 
 ## Run
 
@@ -27,7 +29,7 @@ npm run contracts:generate
 npm run contracts:check
 ```
 
-See [`docs/product.md`](docs/product.md), [`docs/architecture.md`](docs/architecture.md), [`docs/architecture-todo.md`](docs/architecture-todo.md), [`docs/frontend-architecture.md`](docs/frontend-architecture.md), [`docs/frontend-data-consumption.md`](docs/frontend-data-consumption.md), [`docs/realtime-client-and-hot-store.md`](docs/realtime-client-and-hot-store.md), [`docs/backend-architecture.md`](docs/backend-architecture.md), [`reports/stage-one.md`](reports/stage-one.md), [`reports/data-quality.md`](reports/data-quality.md), [`reports/stage-three.md`](reports/stage-three.md), [`reports/stage-four.md`](reports/stage-four.md), [`reports/stage-five.md`](reports/stage-five.md), and [`reports/stage-six.md`](reports/stage-six.md).
+See [`docs/product.md`](docs/product.md), [`docs/architecture.md`](docs/architecture.md), [`docs/architecture-todo.md`](docs/architecture-todo.md), [`docs/frontend-architecture.md`](docs/frontend-architecture.md), [`docs/frontend-data-consumption.md`](docs/frontend-data-consumption.md), [`docs/realtime-client-and-hot-store.md`](docs/realtime-client-and-hot-store.md), [`docs/backend-architecture.md`](docs/backend-architecture.md), and the stage reports through [`reports/stage-seven.md`](reports/stage-seven.md).
 
 ## Production mode
 

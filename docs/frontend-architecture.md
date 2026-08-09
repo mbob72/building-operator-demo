@@ -2,8 +2,8 @@
 
 Подробный пошаговый путь данных от HTTP/WebSocket до компонентов и deck.gl описан в [`frontend-data-consumption.md`](frontend-data-consumption.md). Взаимодействие `RealtimeClient` и `RealtimeHotStore` разобрано отдельно в [`realtime-client-and-hot-store.md`](realtime-client-and-hot-store.md).
 
-- Актуально на: 2026-08-09
-- Текущий статус: Stage 6 завершён и принят; Stage 7 не начат
+- Актуально на: 2026-08-10
+- Текущий статус: Stage 7 завершён и принят; Stage 8 не начат
 - Назначение: живое описание реализованного frontend; обновляется при каждом этапе и существенном изменении data flow.
 
 ## Пользовательский результат
@@ -13,7 +13,7 @@ Frontend поддерживает два режима:
 - `Floor` — один из восьми этажей West Riverside Hospital;
 - `Building` — восемь небольших планов рядом и все 18 000 устройств.
 
-В обоих режимах работают pan, wheel/touch zoom, fit, GPU picking и одна карточка выбранного устройства. Кнопка `Alarms` стоит первой в toolbar. Панель оператора переключает этажи, ищет по имени/ID и multi-select фильтрует устройства тремя checkbox-рядами: status, protocol и type. Warning/critical alarms видны отдельным контуром на плане; оператор может отфильтровать lifecycle, перейти к устройству и подтвердить active alarm.
+В обоих режимах работают pan, wheel/touch zoom, fit, GPU picking и одна карточка выбранного устройства. Кнопка `Alarms` стоит первой в toolbar. Панель оператора переключает этажи, ищет по имени/ID и multi-select фильтрует устройства тремя checkbox-рядами: status, protocol и type. Warning/critical alarms видны отдельным контуром на плане; оператор может отфильтровать lifecycle, перейти к устройству и подтвердить active alarm. Карточка строит command draft из capabilities, требует confirmation для критичных действий и отдельно показывает desired intent, backend lifecycle и actual telemetry.
 
 ## Компонентная схема
 
@@ -23,7 +23,7 @@ QueryClientProvider
     ├── useQuery(GET /api/floors)
     └── OperatorWorkspace
         ├── useOperatorWorkspaceModel
-        │   ├── Zustand: mode, floor, selection, search, filters
+        │   ├── Zustand: mode, floor, selection, search, filters, command draft
         │   ├── useQuery(GET /api/v1/catalog)
         │   ├── raw GET /api/v1/state/snapshot — bootstrap/resync
         │   └── realtime selectors: renderer status + alarms
@@ -44,7 +44,9 @@ QueryClientProvider
                 ├── zoom / fit
                 ├── diagnostics
                 ├── one hover device tooltip
-                └── one DeviceCard — selected-device telemetry selector
+                └── one DeviceCard
+                    ├── selected-device telemetry/alarm/command selectors
+                    └── CommandControls — draft · confirmation · history
 ```
 
 ## Три независимых потока данных
@@ -56,6 +58,7 @@ POST /api/scene/query   -> scene.features       -> plan layers
 GET  /api/v1/catalog    -> DeviceMetadata[]     -> device positions/icons
 GET  /api/v1/state/...  -> authoritative bootstrap/resync
 WS   /api/v1/realtime   -> ordered event.batch -> indexed hot state
+POST /api/v1/commands   -> pending reconciliation -> indexed commands
 ```
 
 Связи выполняются по `floorId` и `deviceId`. Сцена и устройства визуально совпадают благодаря общей floor-local системе координат, а не потому, что устройства находятся в scene response.
@@ -75,6 +78,8 @@ WS   /api/v1/realtime   -> ordered event.batch -> indexed hot state
 Building-scoped `StateSnapshot` загружается сырым abortable HTTP-запросом прямо из `useRealtimeBootstrap` и сразу заменяет hot store; TanStack Query не хранит копию operational state. После этого `RealtimeClient` открывает WebSocket, отправляет `resume(streamId, afterSequence)` и применяет только непрерывные `event.batch`. Duplicate sequence игнорируется; gap, смена stream и неизвестное локальное состояние запускают такой же прямой HTTP snapshot resync. После disconnect клиент переподключается с exponential backoff 250–5 000 мс и повторно использует последний cursor.
 
 `RealtimeHotStore` — отдельный внешний store, не Zustand и не TanStack Query. Он атомарно заменяет snapshot и хранит индексированные `Map` для telemetry, status, alarms и commands. Один batch публикует одно store notification; per-device revision не даёт позднему patch затереть более новое значение.
+
+HTTP command response reconciles в тот же `commandsById`, не меняя cursor. Lifecycle rank не позволяет более медленному `pending` response откатить уже полученный через WebSocket `accepted`/terminal record.
 
 ```mermaid
 flowchart LR
@@ -178,6 +183,14 @@ Operational snapshot больше не имеет query key: `operator-queries.t
 План не выводит alarm как DOM marker и не подменяет им telemetry status. `alarm-layers.ts` создаёт отдельный instanced `ScatterplotLayer` из unresolved alarms: active warning/critical различаются цветом, acknowledged получает приглушённый контур, resolved остаётся только в истории списка. Marker data строится по полному floor/building scope и поэтому не исчезает из-за search/device filters.
 
 `Locate` находит metadata в building catalog, одним Zustand transition переключает floor mode, выбирает этаж и устройство и очищает device filters. Alarm panel остаётся открытым слева, а карточка устройства появляется справа, поэтому оператор сохраняет контекст списка. На узком экране overlays делят сцену по вертикали. Карточка читает alarms и telemetry независимо и показывает audit author/time после acknowledgement. `DeviceVisualMarkers` даёт toolbar filters, alarm rows и selected-device card единый визуальный язык: atlas icon типа, краткий protocol badge и цветной квадрат текущего telemetry status; severity/state аварии при этом остаются отдельными признаками.
+
+## Stage 7 command consumption
+
+`CommandControls` читает immutable capability выбранного `DeviceMetadata` и создаёт schema-shaped `CommandDraft` в Zustand. Переключение capability или устройства заменяет draft; закрытие карточки очищает его. `setOnOff` использует boolean select, `setSetpoint` — numeric input с contract `minimum`, `maximum` и `step`.
+
+Если capability содержит `requiresConfirmation`, submission сначала открывает modal confirmation dialog. Только явное подтверждение добавляет mock audit fields `confirmedAt`/`confirmedBy` и вызывает `POST /api/v1/commands`. Некритичная capability отправляется напрямую. REST response проходит Zod parsing и немедленно попадает в `RealtimeHotStore.upsertCommand`; последующие `command.upsert` двигают общий ordered cursor.
+
+Карточка показывает не более пяти последних commands устройства. Каждая запись содержит три отдельные строки: immutable desired intent, backend state и independently selected actual telemetry. Сначала `executed` меняет backend badge; только более поздний `telemetry.patch` меняет `Actual`. Frontend никогда не подставляет intent в telemetry самостоятельно.
 
 ## Floor и building rendering
 
@@ -309,6 +322,7 @@ Hover использует штатный deck.gl picking и создаёт ро
 | `src/client/src/selection-layers.ts` | общий заметный selection halo двух renderer |
 | `src/client/src/BuildingOverview.tsx` | layout и rendering всех этажей |
 | `src/client/src/DeviceCard.tsx` | selected device metadata + live telemetry/alarm selectors |
+| `src/client/src/CommandControls.tsx` | capability draft, critical confirmation, command submission и recent lifecycle |
 | `src/client/src/SceneControls.tsx` | общие zoom/fit controls двух renderer |
 | `src/client/src/device-layers.ts` | общие status partition и фабрика device `IconLayer` |
 | `src/client/src/device-visuals.ts` | contract-complete 1:1 type/atlas mapping, status colors, icon LOD |
@@ -326,6 +340,7 @@ Hover использует штатный deck.gl picking и создаёт ро
 - Scene contract/API tests фиксируют обязательный base shell и три причины успешного пустого ответа; UI unit-тест фиксирует соответствующие сообщения.
 - Chromium E2E проверяет рост live cursor вместе с floor switch, filters, overview, zoom, GPU picking и live device card.
 - Alarm selector/component tests проверяют severity/state filters, device type/protocol/status markers, priority marker selection, acknowledge reconciliation и atomic navigation; Chromium проходит полный acknowledge/locate workflow и проверяет markers в списке и выбранной карточке.
+- Command component/hot-store tests проверяют on/off/setpoint drafts, explicit confirmation, desired/backend/actual separation и защиту lifecycle от HTTP regression; Chromium проходит confirmable command до `executed`.
 
 ## Ограничения и следующий шаг
 
@@ -333,5 +348,6 @@ Hover использует штатный deck.gl picking и создаёт ро
 - Overview делает до восьми scene queries на новый zoom band; ответы кешируются, но пока не объединены в отдельный backend batch endpoint.
 - Главный JS chunk около 1 МБ minified из-за deck.gl; code splitting оставлен как измеряемая оптимизация, а не блокер MVP.
 - Browser-level forced disconnect/resync пока покрыт детерминированными client/API tests; Chromium acceptance проверяет штатный live stream.
+- Command submission во время disconnect и polling fallback UI относятся к Stage 8; Stage 7 реализует GET fallback contract/client function, но normal UI использует ordered realtime.
 
-Stage 7 добавит simulated command lifecycle поверх отдельного `commandsById`, не смешивая desired command state с telemetry или alarms.
+Stage 8 не начат. При отдельном явном старте он должен усилить duplicate/stale/gap и disconnect command scenarios, сохранив separate command/telemetry stores.

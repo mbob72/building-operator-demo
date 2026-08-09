@@ -6,6 +6,7 @@ task_log="$(mktemp -t building-operator-production.XXXXXX.log)"
 scene_response="$(mktemp -t building-operator-scene.XXXXXX.json)"
 catalog_response="$(mktemp -t building-operator-catalog.XXXXXX.json)"
 snapshot_response="$(mktemp -t building-operator-snapshot.XXXXXX.json)"
+command_response="$(mktemp -t building-operator-command.XXXXXX.json)"
 
 PORT="$task_port" HOST="127.0.0.1" NODE_ENV="production" \
   node dist/server/server/index.js >"$task_log" 2>&1 &
@@ -14,7 +15,7 @@ server_pid="$!"
 cleanup() {
   kill "$server_pid" 2>/dev/null || true
   wait "$server_pid" 2>/dev/null || true
-  rm -f "$task_log" "$scene_response" "$catalog_response" "$snapshot_response"
+  rm -f "$task_log" "$scene_response" "$catalog_response" "$snapshot_response" "$command_response"
 }
 trap cleanup EXIT
 
@@ -65,12 +66,62 @@ curl --fail --silent \
 
 node -e '
   const response = JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"));
-  if (!response.snapshotId.startsWith("stage-6-live-snapshot-v1:")) process.exit(1);
-  if (!response.streamId.startsWith("stage-6-")) process.exit(1);
+  if (!response.snapshotId.startsWith("stage-7-live-snapshot-v1:")) process.exit(1);
+  if (!response.streamId.startsWith("stage-7-")) process.exit(1);
   if (!Number.isSafeInteger(response.sequence) || response.sequence < 0) process.exit(1);
   if (response.telemetry.length !== 150) process.exit(1);
   if (!response.telemetry.some((item) => item.status === "warning" || item.status === "critical")) process.exit(1);
 ' "$snapshot_response"
+
+command_device_id="$(node -e '
+  const response = JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"));
+  const device = response.devices.find((item) => item.capabilities.commands.some(
+    (capability) => capability.kind === "setOnOff" && !capability.requiresConfirmation,
+  ));
+  if (!device) process.exit(1);
+  process.stdout.write(device.id);
+' "$catalog_response")"
+
+curl --fail --silent \
+  -H 'content-type: application/json' \
+  -d "{\"clientRequestId\":\"production-smoke-command\",\"deviceId\":\"${command_device_id}\",\"intent\":{\"kind\":\"setOnOff\",\"value\":false},\"requestedAt\":\"2026-08-09T12:00:00.000Z\",\"requestedBy\":\"smoke-operator\",\"confirmation\":null}" \
+  "http://127.0.0.1:${task_port}/api/v1/commands" \
+  -o "$command_response"
+
+node -e '
+  const response = JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"));
+  if (!response.command?.id || response.command.state !== "pending") process.exit(1);
+' "$command_response"
+
+command_id="$(node -e '
+  const response = JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"));
+  process.stdout.write(response.command.id);
+' "$command_response")"
+
+sleep 3
+
+curl --fail --silent \
+  "http://127.0.0.1:${task_port}/api/v1/commands/${command_id}" \
+  -o "$command_response"
+
+node -e '
+  const response = JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"));
+  if (response.command?.state !== "executed") process.exit(1);
+  if (!Number.isSafeInteger(response.command.resultTelemetryRevision)) process.exit(1);
+' "$command_response"
+
+curl --fail --silent \
+  "http://127.0.0.1:${task_port}/api/v1/state/snapshot?buildingId=west-riverside&floorIds=west-riverside-level-7" \
+  -o "$snapshot_response"
+
+node -e '
+  const fs = require("node:fs");
+  const snapshot = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+  const command = JSON.parse(fs.readFileSync(process.argv[2], "utf8")).command;
+  const telemetry = snapshot.telemetry.find((item) => item.deviceId === command.deviceId);
+  if (!telemetry || telemetry.revision !== command.resultTelemetryRevision) process.exit(1);
+  if (telemetry.values.on !== false) process.exit(1);
+' "$snapshot_response" "$command_response"
 
 node -e '
   const fs = require("node:fs");

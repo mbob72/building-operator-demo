@@ -1,7 +1,7 @@
 # RealtimeClient and RealtimeHotStore
 
-- Актуально на: 2026-08-09
-- Текущий статус: Stage 6 завершён и принят; Stage 7 не начат
+- Актуально на: 2026-08-10
+- Текущий статус: Stage 7 завершён и принят; Stage 8 не начат
 - Назначение: описание обязанностей и совместной работы двух основных realtime-классов frontend.
 
 ## Кратко
@@ -371,9 +371,11 @@ normal/offline/unknown ↔ warning/critical
 
 #### 5. Alarm и command upserts
 
-Alarm и command events содержат полные records и записываются по ID. Stage 6 consumers подписываются на `alarmsById`; command consumers остаются Stage 7.
+Alarm и command events содержат полные records и записываются по ID. Stage 6 consumers подписываются на `alarmsById`; Stage 7 `DeviceCard` подписывается на `commandsById` и локально выбирает records текущего устройства.
 
 `RealtimeHotStore.upsertAlarm()` дополнительно reconciles schema-valid HTTP acknowledge response. Эта локальная copy-on-write операция меняет только `alarmsById`/`version` и намеренно не меняет `streamId` или `sequence`. Когда серверный `alarm.upsert` приходит через WebSocket, `applyBatch()` идемпотентно записывает тот же record и продвигает общий contiguous cursor. Поэтому UI не ждёт socket round-trip, но transport ordering остаётся единственным владельцем cursor.
+
+`RealtimeHotStore.upsertCommand()` выполняет такой же cursor-neutral reconciliation для HTTP create response. Дополнительный lifecycle rank `pending < accepted < terminal` защищает от race, в котором sequenced `accepted` пришёл раньше завершения HTTP request, а response всё ещё содержит `pending`. Равные и terminal states принимаются как полные authoritative records; ordered stream остаётся владельцем cursor.
 
 #### 6. Atomic publish
 

@@ -64,6 +64,6 @@ Chromium acceptance проверяет рост live sequence вместе с fl
 - Engine и replay находятся в памяти одного процесса; restart намеренно меняет stream и требует snapshot resync.
 - Replay не является durable event log и не разделяется между несколькими server instances.
 - Browser acceptance проверяет штатный live stream; forced reconnect/resync детерминированно покрыт client и WebSocket API tests.
-- Alarm и command events предусмотрены контрактом/store, но их UI и lifecycle относятся к Stage 6/7.
+- Post-stage update: alarm и command UI/lifecycle реализованы и приняты в Stage 6/7; заложенная здесь transport/store boundary сохранена.
 - Полный representative/stress performance benchmark, frame-time, memory и latency percentiles остаются Stage 10.
 - Vite сохраняет предупреждение о frontend chunk около 1,04 МБ minified; корректность Stage 5 от этого не зависит.

@@ -21,7 +21,7 @@ export const App = () => {
     <main className="app-shell">
       <header className="topbar">
         <div>
-          <p className="eyebrow">OPERATOR SCENE / STAGE 6</p>
+          <p className="eyebrow">OPERATOR DEMO / STAGE 7</p>
           <h1>{title}</h1>
         </div>
         <div className="topbar__meta">
@@ -29,6 +29,7 @@ export const App = () => {
           <span>18K DEVICES</span>
           <span>LIVE TELEMETRY</span>
           <span>ALARM LIFECYCLE</span>
+          <span>SIMULATED CONTROL</span>
         </div>
       </header>
       <section className="workspace">

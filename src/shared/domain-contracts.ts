@@ -320,11 +320,13 @@ export const CommandRecordSchema = z.object({
     && (command.acceptedAt === null || command.executedAt === null)) {
     issue('executed commands require acceptedAt and executedAt');
   }
-  if (command.state === 'failed' && (command.failedAt === null || command.failure === null)) {
-    issue('failed commands require failedAt and failure');
+  if (command.state === 'failed'
+    && (command.acceptedAt === null || command.failedAt === null || command.failure === null)) {
+    issue('failed commands require acceptedAt, failedAt and failure');
   }
-  if (command.state === 'timedOut' && command.timedOutAt === null) {
-    issue('timedOut commands require timedOutAt');
+  if (command.state === 'timedOut'
+    && (command.acceptedAt === null || command.timedOutAt === null)) {
+    issue('timedOut commands require acceptedAt and timedOutAt');
   }
 
   const terminalTimestamps = [command.executedAt, command.failedAt, command.timedOutAt]
@@ -332,6 +334,21 @@ export const CommandRecordSchema = z.object({
   if (terminalTimestamps.length > 1) issue('command can have only one terminal timestamp');
   if (command.state !== 'failed' && command.failure !== null) {
     issue('failure details are only valid for failed commands');
+  }
+  if (command.state !== 'executed' && command.executedAt !== null) {
+    issue('executedAt is only valid for executed commands');
+  }
+  if (command.state !== 'failed' && command.failedAt !== null) {
+    issue('failedAt is only valid for failed commands');
+  }
+  if (command.state !== 'timedOut' && command.timedOutAt !== null) {
+    issue('timedOutAt is only valid for timedOut commands');
+  }
+  if (command.state !== 'executed' && command.resultTelemetryRevision !== null) {
+    issue('resultTelemetryRevision is only valid for executed commands');
+  }
+  if (command.state === 'pending' && command.acceptedAt !== null) {
+    issue('pending commands cannot have acceptedAt');
   }
 });
 
@@ -341,6 +358,7 @@ export type DeviceProtocol = z.infer<typeof DeviceProtocolSchema>;
 export type DeviceType = z.infer<typeof DeviceTypeSchema>;
 export type DeviceMetadata = z.infer<typeof DeviceMetadataSchema>;
 export type DeviceCatalog = z.infer<typeof DeviceCatalogSchema>;
+export type CommandCapability = z.infer<typeof CommandCapabilitySchema>;
 export type TelemetryScalar = z.infer<typeof TelemetryScalarSchema>;
 export type DeviceStatus = z.infer<typeof DeviceStatusSchema>;
 export type DeviceTelemetry = z.infer<typeof DeviceTelemetrySchema>;

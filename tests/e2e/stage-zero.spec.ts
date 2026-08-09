@@ -73,7 +73,12 @@ test('streams live state while switching floors, filtering, overviewing, and GPU
   const targetCatalog = await page.request.get(
     '/api/v1/catalog?buildingId=west-riverside&floorIds=west-riverside-level-2',
   );
-  const targetDevices = (await targetCatalog.json()).devices as { id: string }[];
+  const targetDevices = (await targetCatalog.json()).devices as Array<{
+    id: string;
+    capabilities: {
+      commands: Array<{ kind: string; requiresConfirmation: boolean }>;
+    };
+  }>;
   const targetDevice = targetDevices.at(-1);
   if (!targetDevice) throw new Error('Level 2 catalog is empty');
   await page.getByRole('searchbox', { name: 'Search' }).fill(targetDevice.id);
@@ -96,14 +101,21 @@ test('streams live state while switching floors, filtering, overviewing, and GPU
   await page.getByRole('button', { name: 'Floor' }).click();
   await expect(page.getByTestId('floor-scene')).toBeVisible();
 
+  const commandDevice = targetDevices.find((device) => device.capabilities.commands.some(
+    (capability) => capability.kind === 'setOnOff' && capability.requiresConfirmation,
+  ));
+  if (!commandDevice) throw new Error('Level 2 has no confirmable command device');
+  await page.getByRole('searchbox', { name: 'Search' }).fill(commandDevice.id);
+  await expect(page.locator('.operator-toolbar__count')).toHaveText(/1 \/ [\d,]+/);
+
   const canvas = page.locator('canvas');
   const box = await canvas.boundingBox();
   if (!box) throw new Error('DeckGL canvas has no bounding box');
   const deviceCard = page.getByRole('complementary', { name: 'Selected device' });
   const deviceTooltip = page.getByTestId('scene-device-tooltip');
   let hoveredPoint: { x: number; y: number } | undefined;
-  for (let y = 100; y < box.height - 100 && !hoveredPoint; y += 30) {
-    for (let x = 100; x < box.width - 100 && !hoveredPoint; x += 30) {
+  for (let y = 70; y < box.height - 70 && !hoveredPoint; y += 12) {
+    for (let x = 70; x < box.width - 70 && !hoveredPoint; x += 12) {
       await page.mouse.move(box.x + x, box.y + y);
       if (await deviceTooltip.count() > 0) hoveredPoint = { x: box.x + x, y: box.y + y };
     }
@@ -118,6 +130,25 @@ test('streams live state while switching floors, filtering, overviewing, and GPU
     /(normal|warning|critical|offline|unknown) · (online|offline|unknown)/,
   );
   await expect(deviceCard.getByText('LIVE VALUES')).toBeVisible();
+  await expect(deviceCard.getByRole('region', { name: 'Device commands' })).toBeVisible();
+  const actualBefore = await deviceCard.getByText('Actual telemetry', { exact: true }).evaluate(
+    (element) => element.nextElementSibling?.textContent,
+  );
+  const desiredValue = actualBefore === 'ON' ? 'off' : 'on';
+  const desiredText = desiredValue.toUpperCase();
+  await deviceCard.getByRole('combobox', { name: 'Desired state' }).selectOption(desiredValue);
+  await expect(deviceCard.getByText('Draft desired').locator('..')).toContainText(desiredText);
+  await deviceCard.getByRole('button', { name: 'Review command' }).click();
+  const confirmation = page.getByRole('dialog', { name: 'Potentially critical command' });
+  await expect(confirmation).toBeVisible();
+  await expect(confirmation).toContainText('Backend acceptance and actual telemetry');
+  await confirmation.getByRole('button', { name: 'Confirm and send' }).click();
+  const recentCommands = deviceCard.getByRole('region', { name: 'Recent commands' });
+  await expect(recentCommands).toContainText(`Desired: ${desiredText}`);
+  await expect(recentCommands).toContainText(/Backend: (pending|accepted|executed)/);
+  await expect(recentCommands).toContainText('Actual:');
+  await expect(recentCommands).toContainText('Backend: executed', { timeout: 5_000 });
+  await expect(recentCommands).toContainText(`Actual: ${desiredText}`, { timeout: 6_000 });
   await page.getByRole('button', { name: 'Close device card' }).click();
   await expect(deviceCard).toHaveCount(0);
 });

@@ -8,6 +8,7 @@ import {
   type DeviceType,
   type AlarmSeverity,
   type AlarmState,
+  type CommandDraft,
 } from '../../shared/domain-contracts';
 
 export type ViewMode = 'floor' | 'overview';
@@ -33,6 +34,7 @@ interface OperatorState {
   alarmPanelOpen: boolean;
   alarmSeverityFilter: AlarmSeverityFilter;
   alarmStateFilter: AlarmStateFilter;
+  commandDraft: CommandDraft | undefined;
   setViewMode: (viewMode: ViewMode) => void;
   setSelectedFloorId: (selectedFloorId: string) => void;
   setSelectedDeviceId: (selectedDeviceId?: string) => void;
@@ -46,6 +48,7 @@ interface OperatorState {
   setAlarmPanelOpen: (alarmPanelOpen: boolean) => void;
   setAlarmSeverityFilter: (alarmSeverityFilter: AlarmSeverityFilter) => void;
   setAlarmStateFilter: (alarmStateFilter: AlarmStateFilter) => void;
+  setCommandDraft: (commandDraft?: CommandDraft) => void;
   focusDevice: (floorId: string, deviceId: string) => void;
   resetFilters: () => void;
 }
@@ -61,9 +64,14 @@ export const useOperatorStore = create<OperatorState>((set) => ({
   alarmPanelOpen: false,
   alarmSeverityFilter: 'all',
   alarmStateFilter: 'all',
-  setViewMode: (viewMode) => set({ viewMode, selectedDeviceId: undefined }),
-  setSelectedFloorId: (selectedFloorId) => set({ selectedFloorId, selectedDeviceId: undefined }),
-  setSelectedDeviceId: (selectedDeviceId) => set({ selectedDeviceId }),
+  commandDraft: undefined,
+  setViewMode: (viewMode) => set({ viewMode, selectedDeviceId: undefined, commandDraft: undefined }),
+  setSelectedFloorId: (selectedFloorId) => set({
+    selectedFloorId,
+    selectedDeviceId: undefined,
+    commandDraft: undefined,
+  }),
+  setSelectedDeviceId: (selectedDeviceId) => set({ selectedDeviceId, commandDraft: undefined }),
   setSearch: (search) => set({ search }),
   toggleTypeFilter: (type) => set((state) => ({
     typeFilters: toggleValue(state.typeFilters, type),
@@ -84,6 +92,7 @@ export const useOperatorStore = create<OperatorState>((set) => ({
   setAlarmPanelOpen: (alarmPanelOpen) => set({ alarmPanelOpen }),
   setAlarmSeverityFilter: (alarmSeverityFilter) => set({ alarmSeverityFilter }),
   setAlarmStateFilter: (alarmStateFilter) => set({ alarmStateFilter }),
+  setCommandDraft: (commandDraft) => set({ commandDraft }),
   focusDevice: (selectedFloorId, selectedDeviceId) => set({
     viewMode: 'floor',
     selectedFloorId,
@@ -92,6 +101,7 @@ export const useOperatorStore = create<OperatorState>((set) => ({
     typeFilters: allDeviceTypes(),
     protocolFilters: allDeviceProtocols(),
     statusFilters: allDeviceStatuses(),
+    commandDraft: undefined,
   }),
   resetFilters: () => set({
     search: '',

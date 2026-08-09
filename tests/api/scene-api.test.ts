@@ -2,8 +2,11 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   AcknowledgeAlarmResponseSchema,
   CatalogResponseSchema,
+  CommandResponseSchema,
+  CreateCommandResponseSchema,
   StateSnapshotSchema,
 } from '../../src/shared/api-contracts';
+import { deviceCatalog } from '../../src/server/device-catalog';
 import { FloorSummarySchema, SceneResponseSchema } from '../../src/shared/scene-contracts';
 import { buildApp } from '../../src/server/app';
 import { RealtimeEngine } from '../../src/server/realtime-engine';
@@ -327,5 +330,83 @@ describe('alarm API', () => {
     expect(invalid.statusCode).toBe(400);
     expect(missing.statusCode).toBe(404);
     expect(conflict.statusCode).toBe(409);
+  });
+});
+
+describe('command API', () => {
+  it('creates an idempotent pending command and exposes lookup fallback', async () => {
+    const engine = new RealtimeEngine();
+    const app = buildApp({ realtimeEngine: engine });
+    apps.push(app);
+    const device = deviceCatalog.devices.find((item) => item.capabilities.commands.some(
+      (capability) => capability.kind === 'setOnOff' && !capability.requiresConfirmation,
+    ))!;
+    const payload = {
+      clientRequestId: 'api-command-request-1',
+      deviceId: device.id,
+      intent: { kind: 'setOnOff', value: false },
+      requestedAt: '2026-08-09T12:00:00.000Z',
+      requestedBy: 'demo-operator',
+      confirmation: null,
+    } as const;
+
+    const response = await app.inject({ method: 'POST', url: '/api/v1/commands', payload });
+    expect(response.statusCode).toBe(200);
+    const command = CreateCommandResponseSchema.parse(response.json()).command;
+    expect(command).toMatchObject({ state: 'pending', deviceId: device.id, intent: payload.intent });
+    expect(engine.latestSequence).toBe(1);
+
+    const repeated = await app.inject({ method: 'POST', url: '/api/v1/commands', payload });
+    expect(repeated.statusCode).toBe(200);
+    expect(CreateCommandResponseSchema.parse(repeated.json()).command.id).toBe(command.id);
+    expect(engine.latestSequence).toBe(1);
+
+    const lookup = await app.inject({ method: 'GET', url: `/api/v1/commands/${command.id}` });
+    expect(lookup.statusCode).toBe(200);
+    expect(CommandResponseSchema.parse(lookup.json()).command.id).toBe(command.id);
+    expect((await app.inject({
+      method: 'GET',
+      url: '/api/v1/commands/command-missing',
+    })).statusCode).toBe(404);
+  });
+
+  it('rejects invalid command bodies, capabilities, confirmation, and idempotency conflicts', async () => {
+    const engine = new RealtimeEngine();
+    const app = buildApp({ realtimeEngine: engine });
+    apps.push(app);
+    const criticalDevice = deviceCatalog.devices.find((item) => item.capabilities.commands.some(
+      (capability) => capability.kind === 'setOnOff' && capability.requiresConfirmation,
+    ))!;
+    const request = {
+      clientRequestId: 'api-critical-request',
+      deviceId: criticalDevice.id,
+      intent: { kind: 'setOnOff', value: true },
+      requestedAt: '2026-08-09T12:00:00.000Z',
+      requestedBy: 'demo-operator',
+      confirmation: null,
+    } as const;
+
+    expect((await app.inject({
+      method: 'POST', url: '/api/v1/commands', payload: { ...request, requestedBy: '' },
+    })).statusCode).toBe(400);
+    expect((await app.inject({
+      method: 'POST', url: '/api/v1/commands', payload: request,
+    })).statusCode).toBe(422);
+
+    const confirmed = {
+      ...request,
+      confirmation: {
+        confirmedAt: request.requestedAt,
+        confirmedBy: request.requestedBy,
+      },
+    };
+    expect((await app.inject({
+      method: 'POST', url: '/api/v1/commands', payload: confirmed,
+    })).statusCode).toBe(200);
+    expect((await app.inject({
+      method: 'POST',
+      url: '/api/v1/commands',
+      payload: { ...confirmed, intent: { kind: 'setOnOff', value: false } },
+    })).statusCode).toBe(409);
   });
 });

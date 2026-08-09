@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { StateSnapshot } from '../../src/shared/api-contracts';
 import { EventBatchMessageSchema } from '../../src/shared/realtime-contracts';
 import { RealtimeHotStore } from '../../src/client/src/realtime-hot-store';
-import { makeAlarm, makeTelemetry } from './device-fixtures';
+import { makeAlarm, makeCommand, makeTelemetry } from './device-fixtures';
 
 const timestamp = '2026-08-09T12:00:00.000Z';
 const initialSnapshot = (): StateSnapshot => ({
@@ -40,6 +40,18 @@ const batch = (events: Array<{
 });
 
 describe('RealtimeHotStore', () => {
+  it('does not regress a command when a slower HTTP response contains an older lifecycle state', () => {
+    const store = new RealtimeHotStore();
+    const accepted = makeCommand('command-1', 'device-1', {
+      state: 'accepted',
+      acceptedAt: '2026-08-09T12:00:01.000Z',
+    });
+    store.replaceSnapshot({ ...initialSnapshot(), commands: [accepted] });
+
+    store.upsertCommand(makeCommand('command-1', 'device-1'));
+
+    expect(store.getSnapshot().commandsById.get('command-1')).toEqual(accepted);
+  });
   it('atomically replaces all indexed hot state from a snapshot', () => {
     const store = new RealtimeHotStore();
     const listener = vi.fn();

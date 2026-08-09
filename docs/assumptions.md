@@ -48,7 +48,11 @@ The HTTP hot-state snapshot is authoritative for telemetry, alarms, commands, an
 
 ## A-010 Command execution
 
-All MVP commands are simulated. Backend command state and actual telemetry are separate, and an `executed` command does not by itself prove that the requested physical value is currently observed.
+All MVP commands are simulated. Backend command state and actual telemetry are separate, and an `executed` command does not by itself prove that the requested value is already observed. Stage 7 emits a later synthetic telemetry patch for successful commands so the demo converges visibly; only that patch changes actual state.
+
+Stage 7 uses short in-process timers and a deterministic demo outcome distribution: most commands execute, while every ninth and tenth completion fail or time out. Successful completion schedules a separate telemetry confirmation after 650 ms, mapping on/off to the declared boolean channel and setpoint to `setpoint`/`level` (or the declared numeric fallback). Timers, command records, idempotency keys and audit fields are ephemeral and reset with the process. This is a UI/lifecycle fixture, not a physical model, durable queue or safety controller.
+
+The server validates device capabilities, setpoint range/step and required confirmation. The browser-provided `demo-operator` identity and timestamps remain untrusted mock audit data per A-007.
 
 ## A-011 Binding safety
 

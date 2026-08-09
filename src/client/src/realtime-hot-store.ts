@@ -1,5 +1,6 @@
 import {
   AlarmSchema,
+  CommandRecordSchema,
   DeviceTelemetrySchema,
   type Alarm,
   type CommandRecord,
@@ -43,6 +44,14 @@ export interface RealtimeHotSnapshot {
   priorityMembershipVersion: number;
   priorityMembershipChanged: boolean;
 }
+
+const commandStateRank: Record<CommandRecord['state'], number> = {
+  pending: 0,
+  accepted: 1,
+  executed: 2,
+  failed: 2,
+  timedOut: 2,
+};
 
 const emptySnapshot = (): RealtimeHotSnapshot => ({
   telemetryByDeviceId: new Map(),
@@ -91,6 +100,20 @@ export class RealtimeHotStore {
     this.publish({
       ...this.snapshot,
       alarmsById,
+      version: this.snapshot.version + 1,
+    });
+  }
+
+  upsertCommand(command: CommandRecord) {
+    const parsed = CommandRecordSchema.parse(command);
+    const current = this.snapshot.commandsById.get(parsed.id);
+    if (current && commandStateRank[current.state] > commandStateRank[parsed.state]) return;
+    if (current && JSON.stringify(current) === JSON.stringify(parsed)) return;
+    const commandsById = new Map(this.snapshot.commandsById);
+    commandsById.set(parsed.id, parsed);
+    this.publish({
+      ...this.snapshot,
+      commandsById,
       version: this.snapshot.version + 1,
     });
   }

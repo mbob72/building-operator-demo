@@ -1,7 +1,7 @@
 # Backend architecture
 
-- Актуально на: 2026-08-09
-- Текущий статус: Stage 6 завершён и принят; Stage 7 не начат
+- Актуально на: 2026-08-10
+- Текущий статус: Stage 7 завершён и принят; Stage 8 не начат
 - Назначение: живое описание реализованного backend; обновляется при каждом этапе и существенном изменении API, хранения или runtime topology.
 
 ## Роль backend
@@ -26,6 +26,7 @@ flowchart LR
     SnapshotAPI["GET /api/v1/state/snapshot"]
     RealtimeAPI["WS /api/v1/realtime"]
     AckAPI["POST /api/v1/alarms/:id/acknowledge"]
+    CommandAPI["POST/GET /api/v1/commands"]
 
     FloorIndex --> SceneRepo
     Scenes --> SceneRepo
@@ -40,6 +41,7 @@ flowchart LR
     Engine --> SnapshotAPI
     Engine --> RealtimeAPI
     Engine --> AckAPI
+    Engine --> CommandAPI
 ```
 
 Backend не рендерит планы, не разбирает IFC на запросе и не подключается к физическим устройствам. Raw IFC обрабатывает отдельный offline pipeline.
@@ -94,7 +96,7 @@ Render запускает один Node service и проверяет `/api/heal
 
 `device-catalog.ts` синхронно читает и распаковывает `west-riverside.devices-18000.json.gz`, валидирует полный `DeviceCatalog` и хранит его в памяти. Gzip-файл около 471 КБ. `selectCatalogFloors()` создаёт floor/building scope линейной фильтрацией массива.
 
-### Realtime engine и Stage 6 alarms
+### Realtime engine, alarms и Stage 7 commands
 
 `state-snapshot.ts` отдельно от catalog вычисляет initial `DeviceTelemetry` на устройство:
 
@@ -111,6 +113,10 @@ Mock simulator раз в 250 мс генерирует один batch из 24 te
 `initial-alarms.ts` создаёт по четыре deterministic alarm на этаж: active warning, active critical, acknowledged warning и resolved critical. Это demo fixture поверх существующих устройств, а не производственный alarm detector. Engine индексирует records по `alarmId`; floor-scoped snapshot включает только alarms устройств этого scope.
 
 Alarm transitions монотонны: `active → acknowledged | resolved`, `acknowledged → resolved`, `resolved` не реактивируется. Immutable identity (`deviceId`, severity, code, createdAt) не меняется внутри lifecycle. Каждый принятый transition публикует полный `alarm.upsert` через тот же building sequence/replay, что telemetry.
+
+Command records индексируются отдельно по `commandId`, а `clientRequestId → commandId` обеспечивает process-local idempotency. Перед созданием engine проверяет существование устройства, capability kind, setpoint range/step и required confirmation. Новый record публикуется как `pending`; timers через 350 мс публикуют `accepted`, затем через 1 200 мс один terminal state. Demo distribution выполняет восемь из десяти команд, девятую завершает `failed`, десятую — `timedOut`; injected outcome и delays делают тесты детерминированными.
+
+Command intent и telemetry не мержатся. Через 650 мс после `executed` simulator выбирает объявленный boolean channel для on/off или `setpoint`/`level` numeric channel, публикует обычный revisioned `telemetry.patch`, затем повторно публикует terminal command с `resultTelemetryRevision`. Это даёт UI два наблюдаемых момента: backend execution и более позднюю actual convergence. `failed` и `timedOut` не публикуют telemetry; status/connection командой не переписываются.
 
 ## HTTP API
 
@@ -154,11 +160,19 @@ Snapshot отражает mutable engine state, поэтому `snapshotId` и `
 
 Body валидируется `AcknowledgeAlarmRequestSchema` и содержит `acknowledgedBy`/`acknowledgedAt`. Active alarm атомарно становится acknowledged, сохраняет автора/время и расходует один realtime sequence. Повторный запрос идемпотентно возвращает существующий acknowledged record без нового event; неизвестный ID даёт `404`, resolved alarm — `409`, schema-invalid body — `400`. Успешный response проходит `AcknowledgeAlarmResponseSchema` и имеет `Cache-Control: no-store`.
 
+### `POST /api/v1/commands`
+
+Body проходит `CreateCommandRequestSchema`. Первый запрос с новым `clientRequestId` создаёт `pending` record, расходует один sequence и возвращает `CreateCommandResponse` с `Cache-Control: no-store`. Точный повтор возвращает текущую версию того же command без нового event. Повтор ключа с другим payload даёт `409`; неизвестное устройство — `404`; unsupported intent, invalid setpoint или отсутствующее/неконсистентное confirmation — `422`; schema-invalid body — `400`.
+
+### `GET /api/v1/commands/:commandId`
+
+Возвращает текущий полный `CommandRecord` как polling fallback, когда realtime недоступен. Endpoint не меняет lifecycle и cursor, использует `Cache-Control: no-store`; неизвестный ID даёт `404`.
+
 ### `GET /api/v1/realtime` — WebSocket upgrade
 
 После client `resume` endpoint отправляет `hello`, проверяет building/floor scope и cursor, затем синхронно отдаёт накопленный replay и подписывает socket на новые batches. Если stream изменился, cursor находится впереди server или выпал из retention window, сервер возвращает `resync.required` с причиной `streamChanged`, `serverRestart` или `cursorExpired` и snapshot path. Heartbeat отправляется каждые 5 секунд.
 
-Sequence принадлежит всему building stream. Сервер не вырезает floor-specific события из batch: иначе один общий cursor получил бы ложные gaps. Floor scope остаётся допустимым в handshake для будущей маршрутизации, но текущий Stage 6 клиент bootstrap/resume делает по зданию.
+Sequence принадлежит всему building stream. Сервер не вырезает floor-specific события из batch: иначе один общий cursor получил бы ложные gaps. Floor scope остаётся допустимым в handshake для будущей маршрутизации, но текущий Stage 7 клиент bootstrap/resume делает по зданию.
 
 ## Контракты и разделение данных
 
@@ -167,7 +181,7 @@ Runtime source of truth находится в `src/shared`:
 - `scene-contracts.ts` — floor, scene query/response;
 - `domain-contracts.ts` — metadata, telemetry, alarm, command;
 - `api-contracts.ts` — catalog/snapshot/operational REST;
-- `realtime-contracts.ts` — ordered transport, включая `alarm.upsert`.
+- `realtime-contracts.ts` — ordered transport, включая `alarm.upsert` и `command.upsert`.
 
 ```text
 scene repository    -> geometry, keyed by floorId
@@ -182,12 +196,14 @@ realtime engine     -> authoritative hot data + ordered replay, keyed by entity 
 - `400` — schema-invalid query/body;
 - `404` — неизвестный building/floor;
 - `409` — попытка acknowledge уже resolved alarm;
+- `409` — reuse `clientRequestId` с другим command payload;
+- `422` — command нарушает capability, setpoint или confirmation rules;
 - `304` — совпавший catalog ETag или точный snapshot stream/sequence ETag;
 - `200` — успешный ответ.
 
 Stage 0/3/4 routes ещё используют упрощённые `{ error, details? }`; единый `ApiError` middleware остаётся будущим улучшением. Compression применяется глобально к достаточно большим ответам, но ETag вычисляется из version/scope, а не из encoded body.
 
-## Проверки Stage 6
+## Проверки Stage 7
 
 API coverage проверяет:
 
@@ -206,7 +222,9 @@ Realtime coverage дополнительно проверяет contiguous batch
 
 Alarm coverage проверяет floor scope snapshot, наличие warning/critical и всех lifecycle states, acknowledge event/audit fields, повторную идемпотентность, разрешённый resolve, запрет reactivation и HTTP `400/404/409`.
 
-Production smoke проверяет compiled server, HTML, scene, catalog, snapshot и realtime batch.
+Command coverage проверяет все три terminal outcomes, последовательность полных `command.upsert`, delayed on/off/setpoint telemetry convergence только для `executed`, `resultTelemetryRevision`, scoped snapshot, exact-repeat idempotency, конфликт ключа, capability/setpoint/confirmation validation и HTTP create/lookup.
+
+Production smoke проверяет compiled server, HTML, scene, catalog, snapshot, command creation и realtime batch.
 
 ## Ограничения и следующий шаг
 
@@ -215,5 +233,7 @@ Production smoke проверяет compiled server, HTML, scene, catalog, snaps
 - Нет database, authentication/authorization, audit log и включённого Fastify logger.
 - Scene/catalog/snapshot имеют отдельные version tokens; runtime compatibility handshake ещё не реализован.
 - Replay находится только в памяти и ограничен 5 000 событиями; это намеренный MVP fallback к authoritative snapshot, не durable event log.
+- Commands, timers и idempotency index находятся в памяти процесса; restart удаляет историю и незавершённые команды.
+- Delayed telemetry convergence — synthetic fixture, а не подтверждение physical controller или модель динамики оборудования.
 
-Stage 7 добавит simulated command lifecycle и REST mutations поверх уже существующих `commandsById`/`command.upsert`; telemetry, alarms и stable catalog останутся отдельными.
+Stage 8 не начат. При отдельном явном старте он должен проверить команды во время disconnect, неизвестные устройства, дубли/устаревшие сообщения и безопасное восстановление, не меняя границу desired/backend/actual.

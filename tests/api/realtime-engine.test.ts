@@ -3,6 +3,7 @@ import { EventBatchMessageSchema } from '../../src/shared/realtime-contracts';
 import { initialAlarms } from '../../src/server/initial-alarms';
 import { RealtimeEngine } from '../../src/server/realtime-engine';
 import { initialTelemetry } from '../../src/server/state-snapshot';
+import { deviceCatalog } from '../../src/server/device-catalog';
 
 const now = () => new Date('2026-08-09T12:00:00.000Z');
 
@@ -146,5 +147,153 @@ describe('RealtimeEngine', () => {
       resolvedAt: null,
     }])).toBeUndefined();
     expect(engine.getAlarm(initial.id)?.state).toBe('resolved');
+  });
+
+  it.each(['executed', 'failed', 'timedOut'] as const)(
+    'publishes pending, accepted, and %s, converging telemetry only after execution',
+    (outcome) => {
+      vi.useFakeTimers();
+      try {
+        const device = deviceCatalog.devices.find((item) => (
+          item.capabilities.commands.some((capability) => (
+            capability.kind === 'setOnOff' && !capability.requiresConfirmation
+          ))
+        ))!;
+        const engine = new RealtimeEngine({
+          streamId: 'stream-command',
+          now,
+          commandAcceptanceDelayMs: 10,
+          commandCompletionDelayMs: 20,
+          commandTelemetryDelayMs: 40,
+          commandOutcome: () => outcome,
+        });
+        const beforeTelemetry = engine.getTelemetry(device.id);
+        const listener = vi.fn();
+        engine.subscribe(listener);
+        const request = {
+          clientRequestId: `request-${outcome}`,
+          deviceId: device.id,
+          intent: { kind: 'setOnOff' as const, value: false },
+          requestedAt: now().toISOString(),
+          requestedBy: 'operator-1',
+          confirmation: null,
+        };
+
+        const created = engine.createCommand(request);
+        expect(created.status).toBe('created');
+        if (created.status !== 'created') throw new Error('command was not created');
+        expect(created.command.state).toBe('pending');
+        expect(engine.latestSequence).toBe(1);
+
+        vi.advanceTimersByTime(10);
+        expect(engine.getCommand(created.command.id)?.state).toBe('accepted');
+        vi.advanceTimersByTime(20);
+        expect(engine.getCommand(created.command.id)?.state).toBe(outcome);
+        expect(engine.latestSequence).toBe(3);
+        expect(engine.getTelemetry(device.id)).toEqual(beforeTelemetry);
+
+        vi.advanceTimersByTime(40);
+        if (outcome === 'executed') {
+          const telemetry = engine.getTelemetry(device.id)!;
+          expect(telemetry.revision).toBe(beforeTelemetry!.revision + 1);
+          expect(telemetry.values.on).toBe(false);
+          expect(engine.getCommand(created.command.id)?.resultTelemetryRevision)
+            .toBe(telemetry.revision);
+          expect(engine.latestSequence).toBe(5);
+          expect(listener.mock.calls.map((call) => call[0].events[0].event.type)).toEqual([
+            'command.upsert',
+            'command.upsert',
+            'command.upsert',
+            'telemetry.patch',
+            'command.upsert',
+          ]);
+        } else {
+          expect(engine.getTelemetry(device.id)).toEqual(beforeTelemetry);
+          expect(engine.latestSequence).toBe(3);
+        }
+        expect(engine.snapshot([device.floorId]).commands).toHaveLength(1);
+
+        expect(engine.createCommand(request)).toMatchObject({
+          status: 'created',
+          command: { id: created.command.id, state: outcome },
+        });
+        expect(engine.latestSequence).toBe(outcome === 'executed' ? 5 : 3);
+        expect(engine.createCommand({ ...request, intent: { kind: 'setOnOff', value: true } }))
+          .toMatchObject({ status: 'idempotency-conflict' });
+        engine.stopSimulator();
+      } finally {
+        vi.useRealTimers();
+      }
+    },
+  );
+
+  it('converges a successful setpoint command onto its declared telemetry channel', () => {
+    vi.useFakeTimers();
+    try {
+      const device = deviceCatalog.devices.find((item) => (
+        item.capabilities.commands.some((capability) => capability.kind === 'setSetpoint')
+      ))!;
+      const capability = device.capabilities.commands.find(
+        (item) => item.kind === 'setSetpoint',
+      )!;
+      const desired = capability.minimum + capability.step;
+      const engine = new RealtimeEngine({
+        now,
+        commandAcceptanceDelayMs: 10,
+        commandCompletionDelayMs: 20,
+        commandTelemetryDelayMs: 40,
+        commandOutcome: () => 'executed',
+      });
+      const created = engine.createCommand({
+        clientRequestId: 'setpoint-convergence',
+        deviceId: device.id,
+        intent: { kind: 'setSetpoint', value: desired },
+        requestedAt: now().toISOString(),
+        requestedBy: 'operator-1',
+        confirmation: null,
+      });
+      expect(created.status).toBe('created');
+
+      vi.advanceTimersByTime(70);
+
+      const telemetry = engine.getTelemetry(device.id)!;
+      const key = device.capabilities.telemetry.some((channel) => channel.key === 'setpoint')
+        ? 'setpoint'
+        : 'level';
+      expect(telemetry.values[key]).toBe(desired);
+      engine.stopSimulator();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('validates command capability, setpoint range, and required confirmation', () => {
+    const engine = new RealtimeEngine({ now });
+    const criticalDevice = deviceCatalog.devices.find((item) => (
+      item.capabilities.commands.some((capability) => capability.requiresConfirmation)
+    ))!;
+    const setpointDevice = deviceCatalog.devices.find((item) => (
+      item.capabilities.commands.some((capability) => capability.kind === 'setSetpoint')
+    ))!;
+    const base = {
+      requestedAt: now().toISOString(),
+      requestedBy: 'operator-1',
+      confirmation: null,
+    };
+
+    expect(engine.createCommand({
+      ...base,
+      clientRequestId: 'missing-confirmation',
+      deviceId: criticalDevice.id,
+      intent: { kind: 'setOnOff', value: true },
+    })).toMatchObject({ status: 'confirmation-required' });
+    expect(engine.createCommand({
+      ...base,
+      clientRequestId: 'bad-setpoint',
+      deviceId: setpointDevice.id,
+      intent: { kind: 'setSetpoint', value: 999 },
+    })).toMatchObject({ status: 'invalid-setpoint' });
+    expect(engine.latestSequence).toBe(0);
+    engine.stopSimulator();
   });
 });
