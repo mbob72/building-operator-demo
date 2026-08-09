@@ -1,4 +1,5 @@
 import type { FloorSummary } from '../../shared/scene-contracts';
+import { AlarmPanel } from './AlarmPanel';
 import { BuildingOverview } from './BuildingOverview';
 import { FloorScene } from './FloorScene';
 import { OperatorToolbar } from './OperatorToolbar';
@@ -34,6 +35,8 @@ export const OperatorWorkspace = ({ floors }: OperatorWorkspaceProps) => {
             floor={model.selectedFloor}
             floors={floors}
             devices={model.filteredDevices}
+            alarmDevices={model.devices}
+            alarmsById={model.alarmsById}
             statusByDeviceId={model.statusByDeviceId}
             dirtyStatusDeviceIds={model.dirtyStatusDeviceIds}
             statusVersion={model.statusVersion}
@@ -47,6 +50,8 @@ export const OperatorWorkspace = ({ floors }: OperatorWorkspaceProps) => {
           <BuildingOverview
             floors={floors}
             devices={model.filteredDevices}
+            alarmDevices={model.devices}
+            alarmsById={model.alarmsById}
             statusByDeviceId={model.statusByDeviceId}
             dirtyStatusDeviceIds={model.dirtyStatusDeviceIds}
             statusVersion={model.statusVersion}
@@ -56,6 +61,7 @@ export const OperatorWorkspace = ({ floors }: OperatorWorkspaceProps) => {
             onSelectDevice={model.onSelectDevice}
           />
         )}
+        <AlarmPanel devices={model.catalogDevices} />
       </div>
     </>
   );

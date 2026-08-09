@@ -1,14 +1,16 @@
 import { useMemo } from 'react';
 import { PathLayer, PolygonLayer, TextLayer } from '@deck.gl/layers';
-import type { DeviceMetadata, DeviceStatus } from '../../shared/domain-contracts';
+import type { Alarm, DeviceMetadata, DeviceStatus } from '../../shared/domain-contracts';
 import type { SceneFeature, SceneResponse } from '../../shared/scene-contracts';
 import {
   createDeviceIconLayer,
   deviceDataRanges,
   partitionDeviceItems,
 } from './device-layers';
+import { createAlarmIndicatorLayer } from './alarm-layers';
+import { selectVisibleAlarmByDevice } from './alarm-model';
 import { FLOOR_DEVICE_LAYER_IDS } from './floor-scene-config';
-import { selectFloorDeviceLabels } from './floor-scene-labels';
+import { createSelectionIndicatorLayer } from './selection-layers';
 import { featureColor } from './scene-visuals';
 import type { ElementSize } from './use-element-size';
 import type { SceneViewState } from './viewport';
@@ -23,6 +25,8 @@ interface UseFloorSceneLayersOptions {
   viewState: SceneViewState;
   scene: SceneResponse | undefined;
   devices: DeviceMetadata[];
+  alarmDevices: DeviceMetadata[];
+  alarmsById: ReadonlyMap<string, Alarm>;
   statusByDeviceId: ReadonlyMap<string, DeviceStatus>;
   dirtyStatusDeviceIds: ReadonlySet<string>;
   statusVersion: number;
@@ -37,6 +41,8 @@ export const useFloorSceneLayers = ({
   viewState,
   scene,
   devices,
+  alarmDevices,
+  alarmsById,
   statusByDeviceId,
   dirtyStatusDeviceIds,
   statusVersion,
@@ -47,6 +53,14 @@ export const useFloorSceneLayers = ({
   const deviceGroups = useMemo(
     () => partitionDeviceItems(devices, (device) => device, statusByDeviceId),
     [devices, priorityMembershipVersion],
+  );
+  const alarmByDeviceId = useMemo(
+    () => selectVisibleAlarmByDevice(alarmsById.values()),
+    [alarmsById],
+  );
+  const alarmLayerData = useMemo(
+    () => alarmDevices.filter((device) => alarmByDeviceId.has(device.id)),
+    [alarmByDeviceId, alarmDevices],
   );
 
   const normalLayerData = useMemo(
@@ -69,15 +83,6 @@ export const useFloorSceneLayers = ({
       : deviceDataRanges(priorityLayerData, (device) => device, dirtyStatusDeviceIds),
     [dirtyStatusDeviceIds, priorityLayerData, priorityMembershipChanged],
   );
-
-  const deviceLabels = useMemo(() => selectFloorDeviceLabels({
-    floorId,
-    size,
-    viewState,
-    devices,
-    priorityDevices: deviceGroups.priority,
-    selectedDevice,
-  }), [deviceGroups.priority, devices, floorId, selectedDevice, size, viewState]);
 
   const layers = useMemo(() => {
     const polygonFeatures: PolygonFeature[] = [];
@@ -135,6 +140,11 @@ export const useFloorSceneLayers = ({
         getTextAnchor: 'middle',
         getAlignmentBaseline: 'center',
       }),
+      createSelectionIndicatorLayer({
+        id: 'floor-selected-device',
+        data: selectedDevice?.floorId === floorId ? [selectedDevice] : [],
+        getPosition,
+      }),
       createDeviceIconLayer({
         ...deviceLayerOptions,
         id: FLOOR_DEVICE_LAYER_IDS[0],
@@ -147,25 +157,18 @@ export const useFloorSceneLayers = ({
         data: priorityLayerData,
         dataDiff: priorityDataDiff,
       }),
-      new TextLayer<DeviceMetadata>({
-        id: 'device-labels',
-        data: deviceLabels,
+      createAlarmIndicatorLayer({
+        id: 'floor-alarm-indicators',
+        data: alarmLayerData,
+        getDevice: (device) => device,
         getPosition,
-        getText: (device) => device.name,
-        getColor: [228, 241, 240, 245],
-        getSize: 11,
-        getPixelOffset: [0, -13],
-        sizeUnits: 'pixels',
-        fontFamily: 'IBM Plex Mono, monospace',
-        getTextAnchor: 'middle',
-        getAlignmentBaseline: 'bottom',
-        background: true,
-        getBackgroundColor: [7, 19, 23, 220],
-        backgroundPadding: [3, 2],
+        alarmByDeviceId,
       }),
     ];
   }, [
-    deviceLabels,
+    alarmByDeviceId,
+    alarmLayerData,
+    floorId,
     normalDataDiff,
     normalLayerData,
     priorityDataDiff,

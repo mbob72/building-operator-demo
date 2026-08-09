@@ -1,4 +1,5 @@
 import {
+  AlarmSchema,
   DeviceTelemetrySchema,
   type Alarm,
   type CommandRecord,
@@ -79,6 +80,19 @@ export class RealtimeHotStore {
 
   reset() {
     this.publish(emptySnapshot());
+  }
+
+  upsertAlarm(alarm: Alarm) {
+    const parsed = AlarmSchema.parse(alarm);
+    const current = this.snapshot.alarmsById.get(parsed.id);
+    if (current && JSON.stringify(current) === JSON.stringify(parsed)) return;
+    const alarmsById = new Map(this.snapshot.alarmsById);
+    alarmsById.set(parsed.id, parsed);
+    this.publish({
+      ...this.snapshot,
+      alarmsById,
+      version: this.snapshot.version + 1,
+    });
   }
 
   replaceSnapshot(snapshot: StateSnapshot) {

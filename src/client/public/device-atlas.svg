@@ -1,12 +1,42 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="256" height="32" viewBox="0 0 256 32">
-  <g fill="#fff" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <circle cx="16" cy="16" r="7" fill="none"/><path d="M16 3v4M16 25v4M3 16h4M25 16h4"/>
-    <path d="M48 5l11 11-11 11-11-11z" fill="none"/><circle cx="48" cy="16" r="3"/>
-    <path d="M80 4l12 23H68z" fill="none"/><path d="M80 11v8M80 23v.5"/>
-    <circle cx="112" cy="16" r="3"/><path d="M112 13c-7-11-11-3-5 3M115 16c11-7 3-11-3-5M112 19c7 11 11 3 5-3M109 16c-11 7-3 11 3 5" fill="none"/>
-    <rect x="133" y="7" width="22" height="18" rx="2" fill="none"/><path d="M139 12h10M139 17h6M139 22h12"/>
-    <rect x="166" y="14" width="20" height="13" rx="2" fill="none"/><path d="M170 14V9a6 6 0 0112 0v5" fill="none"/>
-    <path d="M198 24a10 10 0 0120 0" fill="none"/><path d="M208 21l5-7"/><circle cx="208" cy="24" r="2"/>
-    <circle cx="240" cy="16" r="11" fill="none"/><path d="M240 10v12M234 16h12"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="608" height="32" viewBox="0 0 608 32">
+  <g fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <!-- light -->
+    <circle cx="16" cy="15" r="6"/><path d="M13 22h6M14 26h4M16 3v3M5 7l2 2M27 7l-2 2M3 16h3M26 16h3"/>
+    <!-- presence-sensor -->
+    <circle cx="48" cy="8" r="3"/><path d="M48 11v8M43 27l5-8 5 8M42 14l6 3 6-3M39 8a10 10 0 000 14M57 8a10 10 0 010 14"/>
+    <!-- temperature-sensor -->
+    <path d="M77 7a3 3 0 016 0v11a6 6 0 11-6 0z"/><path d="M80 10v12"/><circle cx="80" cy="23" r="2" fill="#fff"/>
+    <!-- co2-sensor -->
+    <circle cx="112" cy="16" r="4"/><circle cx="101" cy="16" r="3"/><circle cx="123" cy="16" r="3"/><path d="M104 16h4M116 16h4M109 9l3-4 3 4"/>
+    <!-- switch -->
+    <rect x="133" y="9" width="22" height="14" rx="7"/><circle cx="141" cy="16" r="4" fill="#fff"/><path d="M149 13v6"/>
+    <!-- actuator -->
+    <rect x="165" y="10" width="12" height="12" rx="2"/><path d="M177 16h10M183 12l4 4-4 4M169 14v4M173 14v4"/>
+    <!-- smoke-detector -->
+    <path d="M197 13h22l-3 7h-16z"/><path d="M202 9c-2-2 2-3 0-5M208 9c-2-2 2-3 0-5M214 9c-2-2 2-3 0-5"/><circle cx="208" cy="17" r="2" fill="#fff"/>
+    <!-- heat-detector -->
+    <path d="M240 28c-7 0-10-5-8-11 1-4 5-6 5-12 5 3 8 8 7 13 2-2 3-4 3-6 4 5 4 16-7 16z"/><path d="M240 25c-3 0-4-3-3-5l3-5c3 3 4 7 0 10z"/>
+    <!-- fire-alarm-sounder -->
+    <path d="M262 13h5l7-6v18l-7-6h-5z"/><path d="M278 11a7 7 0 010 10M282 7a12 12 0 010 18"/>
+    <!-- manual-pull-station -->
+    <rect x="294" y="4" width="20" height="24" rx="2"/><path d="M299 9h10M304 11v10M300 17l4 4 4-4M299 25h10"/>
+    <!-- sprinkler -->
+    <path d="M336 3v9M329 12h14M331 16h10M336 12v4M326 24l2-4 2 4M334 27l2-5 2 5M342 24l2-4 2 4"/>
+    <!-- security-sensor -->
+    <path d="M368 4l10 4v7c0 7-4 11-10 14-6-3-10-7-10-14V8z"/><circle cx="368" cy="14" r="3"/><path d="M368 17v6"/>
+    <!-- hvac-terminal -->
+    <rect x="389" y="7" width="22" height="18" rx="2"/><path d="M394 12h12M394 16h12M394 20h12"/>
+    <!-- hvac-unit -->
+    <circle cx="432" cy="16" r="3"/><path d="M432 13c-7-11-11-3-5 3M435 16c11-7 3-11-3-5M432 19c7 11 11 3 5-3M429 16c-11 7-3 11 3 5"/>
+    <!-- meter -->
+    <path d="M454 24a10 10 0 0120 0"/><path d="M464 21l5-7"/><circle cx="464" cy="24" r="2" fill="#fff"/><path d="M457 18l-2-2M471 18l2-2"/>
+    <!-- electrical-controller -->
+    <rect x="485" y="5" width="22" height="22" rx="2"/><path d="M499 8l-7 10h6l-4 8 8-11h-6z"/>
+    <!-- access-controller -->
+    <rect x="517" y="8" width="22" height="19" rx="2"/><path d="M522 8V6a6 6 0 0112 0v2M524 14h8M524 19h5"/><circle cx="534" cy="22" r="2" fill="#fff"/>
+    <!-- solar-panel -->
+    <path d="M549 11h19l-3 13h-19zM555 11l-2 13M562 11l-2 13M548 17h19M556 24v4M551 28h10"/><circle cx="571" cy="6" r="3"/><path d="M571 1v1M576 6h-1"/>
+    <!-- other -->
+    <circle cx="592" cy="16" r="11"/><path d="M592 10v12M586 16h12"/>
   </g>
 </svg>

@@ -1,7 +1,7 @@
 # Backend architecture
 
 - Актуально на: 2026-08-09
-- Текущий этап: Stage 5, принят 2026-08-09
+- Текущий статус: Stage 6 завершён и принят; Stage 7 не начат
 - Назначение: живое описание реализованного backend; обновляется при каждом этапе и существенном изменении API, хранения или runtime topology.
 
 ## Роль backend
@@ -17,25 +17,29 @@ flowchart LR
     SceneRepo["SceneRepository<br/>ordered floors + Map by floorId"]
     CatalogRepo["DeviceCatalog<br/>stable metadata"]
     Engine["RealtimeEngine<br/>indexed state · sequence · replay"]
-    Simulator["Mock simulator<br/>batched patches"]
+    Simulator["Mock simulator<br/>batched telemetry patches"]
+    InitialAlarms["Deterministic alarm fixture<br/>warning · critical · lifecycle"]
 
     FloorsAPI["GET /api/floors"]
     SceneAPI["POST /api/scene/query"]
     CatalogAPI["GET /api/v1/catalog"]
     SnapshotAPI["GET /api/v1/state/snapshot"]
     RealtimeAPI["WS /api/v1/realtime"]
+    AckAPI["POST /api/v1/alarms/:id/acknowledge"]
 
     FloorIndex --> SceneRepo
     Scenes --> SceneRepo
     CatalogFile --> CatalogRepo
     CatalogRepo --> Engine
     Simulator --> Engine
+    InitialAlarms --> Engine
 
     SceneRepo --> FloorsAPI
     SceneRepo --> SceneAPI
     CatalogRepo --> CatalogAPI
     Engine --> SnapshotAPI
     Engine --> RealtimeAPI
+    Engine --> AckAPI
 ```
 
 Backend не рендерит планы, не разбирает IFC на запросе и не подключается к физическим устройствам. Raw IFC обрабатывает отдельный offline pipeline.
@@ -90,7 +94,7 @@ Render запускает один Node service и проверяет `/api/heal
 
 `device-catalog.ts` синхронно читает и распаковывает `west-riverside.devices-18000.json.gz`, валидирует полный `DeviceCatalog` и хранит его в памяти. Gzip-файл около 471 КБ. `selectCatalogFloors()` создаёт floor/building scope линейной фильтрацией массива.
 
-### Stage 5 realtime engine
+### Realtime engine и Stage 6 alarms
 
 `state-snapshot.ts` отдельно от catalog вычисляет initial `DeviceTelemetry` на устройство:
 
@@ -103,6 +107,10 @@ Render запускает один Node service и проверяет `/api/heal
 `RealtimeEngine` копирует initial telemetry в authoritative indexed state, создаёт новый `streamId` на процесс и владеет глобальным building sequence. Snapshot строится из текущего состояния и валидируется целиком через `StateSnapshotSchema`. Status не записывается в `DeviceMetadata`.
 
 Mock simulator раз в 250 мс генерирует один batch из 24 telemetry patches (96 events/s). Value меняется часто, status существенно реже, чтобы обычный поток проверял hot values без постоянной полной перегруппировки renderer. Engine принимает только revision новее текущей, назначает каждому событию contiguous sequence, хранит последние 5 000 событий и уведомляет listeners один раз на batch. Timer запускается только в runtime server через `onReady` и останавливается через `onClose`; injected API tests остаются детерминированными.
+
+`initial-alarms.ts` создаёт по четыре deterministic alarm на этаж: active warning, active critical, acknowledged warning и resolved critical. Это demo fixture поверх существующих устройств, а не производственный alarm detector. Engine индексирует records по `alarmId`; floor-scoped snapshot включает только alarms устройств этого scope.
+
+Alarm transitions монотонны: `active → acknowledged | resolved`, `acknowledged → resolved`, `resolved` не реактивируется. Immutable identity (`deviceId`, severity, code, createdAt) не меняется внутри lifecycle. Каждый принятый transition публикует полный `alarm.upsert` через тот же building sequence/replay, что telemetry.
 
 ## HTTP API
 
@@ -140,13 +148,17 @@ GET /api/v1/catalog?buildingId=west-riverside&floorIds=<id>&floorIds=<id>
 
 Query scope совпадает с catalog. Ответ содержит отдельные `telemetry`, `alarms`, `commands`, `streamId`, `sequence` и `generatedAt`. Для одного этажа число telemetry records равно числу устройств его catalog; без `floorIds` возвращается 18 000. Snapshot имеет собственный scope-dependent `ETag` и поддерживает точный conditional `304` для неизменившегося cursor.
 
-Stage 5 snapshot отражает mutable engine state, поэтому `snapshotId` и `ETag` включают stream/sequence, а ответ имеет `Cache-Control: no-store`. Он является атомарной точкой восстановления, а не периодически обновляемым query cache.
+Snapshot отражает mutable engine state, поэтому `snapshotId` и `ETag` включают stream/sequence, а ответ имеет `Cache-Control: no-store`. Он является атомарной точкой восстановления, а не периодически обновляемым query cache.
+
+### `POST /api/v1/alarms/:alarmId/acknowledge`
+
+Body валидируется `AcknowledgeAlarmRequestSchema` и содержит `acknowledgedBy`/`acknowledgedAt`. Active alarm атомарно становится acknowledged, сохраняет автора/время и расходует один realtime sequence. Повторный запрос идемпотентно возвращает существующий acknowledged record без нового event; неизвестный ID даёт `404`, resolved alarm — `409`, schema-invalid body — `400`. Успешный response проходит `AcknowledgeAlarmResponseSchema` и имеет `Cache-Control: no-store`.
 
 ### `GET /api/v1/realtime` — WebSocket upgrade
 
 После client `resume` endpoint отправляет `hello`, проверяет building/floor scope и cursor, затем синхронно отдаёт накопленный replay и подписывает socket на новые batches. Если stream изменился, cursor находится впереди server или выпал из retention window, сервер возвращает `resync.required` с причиной `streamChanged`, `serverRestart` или `cursorExpired` и snapshot path. Heartbeat отправляется каждые 5 секунд.
 
-Sequence принадлежит всему building stream. Сервер не вырезает floor-specific события из batch: иначе один общий cursor получил бы ложные gaps. Floor scope остаётся допустимым в handshake для будущей маршрутизации, но текущий Stage 5 клиент bootstrap/resume делает по зданию.
+Sequence принадлежит всему building stream. Сервер не вырезает floor-specific события из batch: иначе один общий cursor получил бы ложные gaps. Floor scope остаётся допустимым в handshake для будущей маршрутизации, но текущий Stage 6 клиент bootstrap/resume делает по зданию.
 
 ## Контракты и разделение данных
 
@@ -155,7 +167,7 @@ Runtime source of truth находится в `src/shared`:
 - `scene-contracts.ts` — floor, scene query/response;
 - `domain-contracts.ts` — metadata, telemetry, alarm, command;
 - `api-contracts.ts` — catalog/snapshot/operational REST;
-- `realtime-contracts.ts` — Stage 5 ordered transport.
+- `realtime-contracts.ts` — ordered transport, включая `alarm.upsert`.
 
 ```text
 scene repository    -> geometry, keyed by floorId
@@ -169,12 +181,13 @@ realtime engine     -> authoritative hot data + ordered replay, keyed by entity 
 
 - `400` — schema-invalid query/body;
 - `404` — неизвестный building/floor;
+- `409` — попытка acknowledge уже resolved alarm;
 - `304` — совпавший catalog ETag или точный snapshot stream/sequence ETag;
 - `200` — успешный ответ.
 
 Stage 0/3/4 routes ещё используют упрощённые `{ error, details? }`; единый `ApiError` middleware остаётся будущим улучшением. Compression применяется глобально к достаточно большим ответам, но ETag вычисляется из version/scope, а не из encoded body.
 
-## Проверки Stage 5
+## Проверки Stage 6
 
 API coverage проверяет:
 
@@ -191,6 +204,8 @@ API coverage проверяет:
 
 Realtime coverage дополнительно проверяет contiguous batch, stale per-device revisions, bounded replay, expired cursor, stream change/server restart resync, live delivery и coalesced burst на 1 000 events. Production smoke открывает compiled WebSocket endpoint, resume-ится от только что полученного snapshot cursor и ждёт следующий batch.
 
+Alarm coverage проверяет floor scope snapshot, наличие warning/critical и всех lifecycle states, acknowledge event/audit fields, повторную идемпотентность, разрешённый resolve, запрет reactivation и HTTP `400/404/409`.
+
 Production smoke проверяет compiled server, HTML, scene, catalog, snapshot и realtime batch.
 
 ## Ограничения и следующий шаг
@@ -201,4 +216,4 @@ Production smoke проверяет compiled server, HTML, scene, catalog, snaps
 - Scene/catalog/snapshot имеют отдельные version tokens; runtime compatibility handshake ещё не реализован.
 - Replay находится только в памяти и ограничен 5 000 событиями; это намеренный MVP fallback к authoritative snapshot, не durable event log.
 
-Stage 6 добавит alarm lifecycle и REST mutations поверх уже существующих `alarmsById`/`alarm.upsert`; telemetry stream и stable catalog останутся отдельными.
+Stage 7 добавит simulated command lifecycle и REST mutations поверх уже существующих `commandsById`/`command.upsert`; telemetry, alarms и stable catalog останутся отдельными.

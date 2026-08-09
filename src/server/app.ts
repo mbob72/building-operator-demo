@@ -4,7 +4,12 @@ import fastifyStatic from '@fastify/static';
 import fastifyWebsocket from '@fastify/websocket';
 import { createHash } from 'node:crypto';
 import { resolve } from 'node:path';
-import { CatalogQuerySchema, StateSnapshotQuerySchema } from '../shared/api-contracts.js';
+import {
+  AcknowledgeAlarmRequestSchema,
+  AcknowledgeAlarmResponseSchema,
+  CatalogQuerySchema,
+  StateSnapshotQuerySchema,
+} from '../shared/api-contracts.js';
 import { SceneQuerySchema } from '../shared/scene-contracts.js';
 import { deviceCatalog, selectCatalogFloors } from './device-catalog.js';
 import { findScene, floors, sceneDatasetVersion } from './scene-repository.js';
@@ -99,6 +104,31 @@ export const buildApp = (options: AppOptions = {}) => {
     reply.header('cache-control', 'no-store');
     if (request.headers['if-none-match'] === etag) return reply.status(304).send();
     return snapshot;
+  });
+
+  app.post('/api/v1/alarms/:alarmId/acknowledge', async (request, reply) => {
+    const { alarmId } = request.params as { alarmId?: string };
+    const parsed = AcknowledgeAlarmRequestSchema.safeParse(request.body);
+    if (!alarmId || !parsed.success) {
+      return reply.status(400).send({
+        error: 'invalid_acknowledge_request',
+        ...(!parsed.success ? { details: parsed.error.issues } : {}),
+      });
+    }
+
+    const result = realtimeEngine.acknowledgeAlarm(alarmId, parsed.data);
+    if (result.status === 'not-found') {
+      return reply.status(404).send({ error: 'alarm_not_found' });
+    }
+    if (result.status === 'resolved') {
+      return reply.status(409).send({
+        error: 'alarm_already_resolved',
+        alarm: result.alarm,
+      });
+    }
+
+    reply.header('cache-control', 'no-store');
+    return AcknowledgeAlarmResponseSchema.parse({ alarm: result.alarm });
   });
 
   app.post('/api/scene/query', async (request, reply) => {

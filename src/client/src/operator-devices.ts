@@ -1,15 +1,11 @@
 import type { DeviceMetadata, DeviceStatus } from '../../shared/domain-contracts';
-import type {
-  DeviceProtocolFilter,
-  DeviceStatusFilter,
-  DeviceTypeFilter,
-} from './operator-store';
+import type { DeviceProtocol, DeviceType } from '../../shared/domain-contracts';
 
 export interface DeviceFilters {
   search: string;
-  type: DeviceTypeFilter;
-  protocol: DeviceProtocolFilter;
-  status: DeviceStatusFilter;
+  types: readonly DeviceType[];
+  protocols: readonly DeviceProtocol[];
+  statuses: readonly DeviceStatus[];
 }
 
 const matchesSearch = (device: DeviceMetadata, normalizedSearch: string) => (
@@ -24,10 +20,13 @@ export const filterDevices = (
   filters: DeviceFilters,
 ) => {
   const normalizedSearch = filters.search.trim().toLocaleLowerCase();
+  const types = new Set(filters.types);
+  const protocols = new Set(filters.protocols);
+  const statuses = new Set(filters.statuses);
   return devices.filter((device) => {
     return matchesSearch(device, normalizedSearch)
-      && (filters.type === 'all' || device.type === filters.type)
-      && (filters.protocol === 'all' || device.protocol === filters.protocol)
-      && (filters.status === 'all' || statusByDeviceId.get(device.id) === filters.status);
+      && types.has(device.type)
+      && protocols.has(device.protocol)
+      && statuses.has(statusByDeviceId.get(device.id) ?? 'unknown');
   });
 };

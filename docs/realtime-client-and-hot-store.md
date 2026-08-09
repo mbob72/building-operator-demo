@@ -1,7 +1,7 @@
 # RealtimeClient and RealtimeHotStore
 
 - Актуально на: 2026-08-09
-- Текущий этап: Stage 5, принят 2026-08-09
+- Текущий статус: Stage 6 завершён и принят; Stage 7 не начат
 - Назначение: описание обязанностей и совместной работы двух основных realtime-классов frontend.
 
 ## Кратко
@@ -11,7 +11,7 @@ Realtime frontend разделён на два класса:
 | Класс | Главный вопрос |
 |---|---|
 | [`RealtimeClient`](../src/client/src/realtime-client.ts#L37) | Как получить ordered сообщения, пережить disconnect и восстановиться? |
-| [`RealtimeHotStore`](../src/client/src/realtime-hot-store.ts#L64) | Можно ли применить сообщение и каким становится актуальное состояние? |
+| [`RealtimeHotStore`](../src/client/src/realtime-hot-store.ts#L65) | Можно ли применить сообщение и каким становится актуальное состояние? |
 
 ```text
 HTTP snapshot / WebSocket
@@ -212,7 +212,7 @@ Client не знает, использует loader обычный building snap
 
 ## RealtimeHotStore
 
-Исходник: [`src/client/src/realtime-hot-store.ts`](../src/client/src/realtime-hot-store.ts#L64).
+Исходник: [`src/client/src/realtime-hot-store.ts`](../src/client/src/realtime-hot-store.ts#L65).
 
 ### Ответственность
 
@@ -270,13 +270,13 @@ Renderer state
 
 ### Subscription API
 
-Store предоставляет `getSnapshot` и `subscribe` в [`realtime-hot-store.ts:68`](../src/client/src/realtime-hot-store.ts#L68). Это контракт, необходимый `useSyncExternalStore`.
+Store предоставляет `getSnapshot` и `subscribe` в [`realtime-hot-store.ts:69`](../src/client/src/realtime-hot-store.ts#L69). Это контракт, необходимый `useSyncExternalStore`.
 
-[`publish()`](../src/client/src/realtime-hot-store.ts#L75) сначала заменяет snapshot целиком, затем уведомляет всех listeners. Поэтому subscriber никогда не видит наполовину применённый batch.
+[`publish()`](../src/client/src/realtime-hot-store.ts#L76) сначала заменяет snapshot целиком, затем уведомляет всех listeners. Поэтому subscriber никогда не видит наполовину применённый batch.
 
 ### replaceSnapshot
 
-[`replaceSnapshot()`](../src/client/src/realtime-hot-store.ts#L84) используется bootstrap и resync.
+[`replaceSnapshot()`](../src/client/src/realtime-hot-store.ts#L98) используется bootstrap и resync.
 
 Transport arrays индексируются:
 
@@ -300,9 +300,9 @@ Snapshot replacement также:
 
 ### Connection state
 
-[`setConnection()`](../src/client/src/realtime-hot-store.ts#L110) меняет только connection/error fields и не создаёт новые domain maps.
+[`setConnection()`](../src/client/src/realtime-hot-store.ts#L124) меняет только connection/error fields и не создаёт новые domain maps.
 
-[`markHeartbeat()`](../src/client/src/realtime-hot-store.ts#L120) принимает heartbeat только если:
+[`markHeartbeat()`](../src/client/src/realtime-hot-store.ts#L134) принимает heartbeat только если:
 
 - `streamId` совпадает;
 - server latest sequence не опережает локально применённый sequence.
@@ -311,11 +311,11 @@ Snapshot replacement также:
 
 ### applyBatch
 
-[`applyBatch()`](../src/client/src/realtime-hot-store.ts#L132) — основная domain transition.
+[`applyBatch()`](../src/client/src/realtime-hot-store.ts#L146) — основная domain transition.
 
 #### 1. Stream-level validation
 
-В [`строках 133–136`](../src/client/src/realtime-hot-store.ts#L133):
+В [`строках 147–150`](../src/client/src/realtime-hot-store.ts#L147):
 
 - другой stream → `stream-mismatch`;
 - `toSequence <= local sequence` → `duplicate`;
@@ -338,7 +338,7 @@ commandsById ??= new Map(currentCommands)
 
 #### 3. Telemetry patch
 
-Ветка начинается в [`realtime-hot-store.ts:148`](../src/client/src/realtime-hot-store.ts#L148).
+Ветка начинается в [`realtime-hot-store.ts:162`](../src/client/src/realtime-hot-store.ts#L162).
 
 Алгоритм:
 
@@ -354,7 +354,7 @@ Stale device revision не откатывает данные, но stream sequen
 
 #### 4. Status и renderer state
 
-Если status изменился, логика в [`realtime-hot-store.ts:163`](../src/client/src/realtime-hot-store.ts#L163):
+Если status изменился, логика в [`realtime-hot-store.ts:177`](../src/client/src/realtime-hot-store.ts#L177):
 
 - обновляет отдельный `statusByDeviceId`;
 - добавляет device ID в `dirtyStatusDeviceIds`;
@@ -371,11 +371,13 @@ normal/offline/unknown ↔ warning/critical
 
 #### 5. Alarm и command upserts
 
-Alarm и command events содержат полные records и записываются по ID в [`realtime-hot-store.ts:172`](../src/client/src/realtime-hot-store.ts#L172). Соответствующие React consumers будут добавлены на Stage 6/7.
+Alarm и command events содержат полные records и записываются по ID. Stage 6 consumers подписываются на `alarmsById`; command consumers остаются Stage 7.
+
+`RealtimeHotStore.upsertAlarm()` дополнительно reconciles schema-valid HTTP acknowledge response. Эта локальная copy-on-write операция меняет только `alarmsById`/`version` и намеренно не меняет `streamId` или `sequence`. Когда серверный `alarm.upsert` приходит через WebSocket, `applyBatch()` идемпотентно записывает тот же record и продвигает общий contiguous cursor. Поэтому UI не ждёт socket round-trip, но transport ordering остаётся единственным владельцем cursor.
 
 #### 6. Atomic publish
 
-В [`realtime-hot-store.ts:181`](../src/client/src/realtime-hot-store.ts#L181) store публикует один итоговый snapshot:
+В [`realtime-hot-store.ts:195`](../src/client/src/realtime-hot-store.ts#L195) store публикует один итоговый snapshot:
 
 - изменённые maps заменяются;
 - неизменённые maps сохраняют identity;
@@ -440,9 +442,10 @@ Store подключается к React через [`useRealtimeSelector`](../sr
 
 | Consumer | Selector |
 |---|---|
-| [`OperatorToolbar`](../src/client/src/OperatorToolbar.tsx#L27) | `connectionStatus`, `sequence` |
-| [`DeviceCard`](../src/client/src/DeviceCard.tsx#L18) | telemetry только выбранного `deviceId` |
-| [`useOperatorWorkspaceModel`](../src/client/src/use-operator-workspace.ts#L14) | status map, dirty IDs и renderer versions |
+| [`OperatorToolbar`](../src/client/src/OperatorToolbar.tsx#L28) | `connectionStatus`, `sequence`, active alarm count |
+| [`AlarmPanel`](../src/client/src/AlarmPanel.tsx#L26) | `alarmsById`, lifecycle filters/actions |
+| [`DeviceCard`](../src/client/src/DeviceCard.tsx#L20) | telemetry и alarms выбранного `deviceId` |
+| [`useOperatorWorkspaceModel`](../src/client/src/use-operator-workspace.ts#L13) | status/alarm maps, dirty IDs и renderer versions |
 
 Обычный value-only batch обновляет telemetry map и cursor. Toolbar обновляет sequence; карточка обновляется только если patch относится к выбранному устройству; тяжёлые device layers не пересобираются.
 

@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import {
+  AlarmSchema,
   DeviceTelemetryPatchSchema,
   DeviceTelemetrySchema,
   type Alarm,
@@ -8,9 +9,14 @@ import {
   type DeviceTelemetryPatch,
   type TelemetryScalar,
 } from '../shared/domain-contracts.js';
-import { StateSnapshotSchema, type StateSnapshot } from '../shared/api-contracts.js';
+import {
+  StateSnapshotSchema,
+  type AcknowledgeAlarmRequest,
+  type StateSnapshot,
+} from '../shared/api-contracts.js';
 import {
   EventBatchMessageSchema,
+  type RealtimeEvent,
   type SequencedRealtimeEvent,
 } from '../shared/realtime-contracts.js';
 import { deviceCatalog } from './device-catalog.js';
@@ -18,6 +24,7 @@ import {
   deviceFloorById,
   initialTelemetry,
 } from './state-snapshot.js';
+import { initialAlarms } from './initial-alarms.js';
 
 export const REALTIME_HEARTBEAT_INTERVAL_MS = 5_000;
 export const REALTIME_SIMULATOR_INTERVAL_MS = 250;
@@ -40,6 +47,16 @@ const nextValue = (value: TelemetryScalar, revision: number): TelemetryScalar =>
   return value;
 };
 
+const canTransitionAlarm = (current: Alarm, next: Alarm) => {
+  if (current.deviceId !== next.deviceId
+    || current.severity !== next.severity
+    || current.code !== next.code
+    || current.createdAt !== next.createdAt) return false;
+  if (current.state === 'active') return true;
+  if (current.state === 'acknowledged') return next.state !== 'active';
+  return next.state === 'resolved';
+};
+
 const scopeIdFor = (floorIds: readonly string[]) => {
   const selected = new Set(floorIds);
   if (selected.size === deviceCatalog.floors.length
@@ -55,7 +72,9 @@ export class RealtimeEngine {
   readonly replayLimit: number;
   private readonly now: () => Date;
   private readonly telemetryByDeviceId: Map<string, DeviceTelemetry>;
-  private readonly alarmsById = new Map<string, Alarm>();
+  private readonly alarmsById = new Map<string, Alarm>(
+    initialAlarms.map((alarm) => [alarm.id, alarm]),
+  );
   private readonly commandsById = new Map<string, CommandRecord>();
   private readonly listeners = new Set<RealtimeListener>();
   private replay: SequencedRealtimeEvent[] = [];
@@ -64,7 +83,7 @@ export class RealtimeEngine {
   private simulatorTimer: ReturnType<typeof setInterval> | undefined;
 
   constructor(options: RealtimeEngineOptions = {}) {
-    this.streamId = options.streamId ?? `stage-5-${randomUUID()}`;
+    this.streamId = options.streamId ?? `stage-6-${randomUUID()}`;
     this.replayLimit = options.replayLimit ?? REALTIME_REPLAY_LIMIT;
     this.now = options.now ?? (() => new Date());
     this.telemetryByDeviceId = new Map(initialTelemetry.map((item) => [item.deviceId, item]));
@@ -82,21 +101,26 @@ export class RealtimeEngine {
     return this.telemetryByDeviceId.get(deviceId);
   }
 
+  getAlarm(alarmId: string) {
+    return this.alarmsById.get(alarmId);
+  }
+
   snapshot(floorIds: readonly string[]): StateSnapshot {
     const selectedFloorIds = new Set(floorIds);
     const telemetry = [...this.telemetryByDeviceId.values()].filter((item) => {
       const floorId = deviceFloorById.get(item.deviceId);
       return floorId !== undefined && selectedFloorIds.has(floorId);
     });
+    const selectedDeviceIds = new Set(telemetry.map((item) => item.deviceId));
     return StateSnapshotSchema.parse({
-      snapshotId: `stage-5-live-snapshot-v1:${this.sequence}:${scopeIdFor(floorIds)}`,
+      snapshotId: `stage-6-live-snapshot-v1:${this.sequence}:${scopeIdFor(floorIds)}`,
       buildingId: deviceCatalog.building.id,
       streamId: this.streamId,
       sequence: this.sequence,
       generatedAt: this.now().toISOString(),
       telemetry,
-      alarms: [...this.alarmsById.values()],
-      commands: [...this.commandsById.values()],
+      alarms: [...this.alarmsById.values()].filter((alarm) => selectedDeviceIds.has(alarm.deviceId)),
+      commands: [...this.commandsById.values()].filter((command) => selectedDeviceIds.has(command.deviceId)),
     });
   }
 
@@ -109,6 +133,29 @@ export class RealtimeEngine {
     if (afterSequence > this.sequence) return undefined;
     if (afterSequence < this.retentionStartSequence - 1) return undefined;
     return this.replay.filter((event) => event.sequence > afterSequence);
+  }
+
+  private publishEvents(rawEvents: readonly RealtimeEvent[]): EventBatch | undefined {
+    if (rawEvents.length === 0) return undefined;
+    const events = rawEvents.map((event): SequencedRealtimeEvent => ({
+      sequence: ++this.sequence,
+      event,
+    }));
+    this.replay.push(...events);
+    if (this.replay.length > this.replayLimit) {
+      this.replay.splice(0, this.replay.length - this.replayLimit);
+    }
+
+    const batch = EventBatchMessageSchema.parse({
+      type: 'event.batch',
+      streamId: this.streamId,
+      emittedAt: this.now().toISOString(),
+      fromSequence: events[0]!.sequence,
+      toSequence: events.at(-1)!.sequence,
+      events,
+    });
+    for (const listener of this.listeners) listener(batch);
+    return batch;
   }
 
   publishTelemetryPatches(rawPatches: readonly DeviceTelemetryPatch[]): EventBatch | undefined {
@@ -127,25 +174,47 @@ export class RealtimeEngine {
     }
     if (acceptedPatches.length === 0) return undefined;
 
-    const events = acceptedPatches.map((patch): SequencedRealtimeEvent => ({
-      sequence: ++this.sequence,
-      event: { type: 'telemetry.patch', payload: patch },
-    }));
-    this.replay.push(...events);
-    if (this.replay.length > this.replayLimit) {
-      this.replay.splice(0, this.replay.length - this.replayLimit);
-    }
+    return this.publishEvents(acceptedPatches.map((patch) => ({
+      type: 'telemetry.patch' as const,
+      payload: patch,
+    })));
+  }
 
-    const batch = EventBatchMessageSchema.parse({
-      type: 'event.batch',
-      streamId: this.streamId,
-      emittedAt: this.now().toISOString(),
-      fromSequence: events[0]!.sequence,
-      toSequence: events.at(-1)!.sequence,
-      events,
+  publishAlarmUpserts(rawAlarms: readonly Alarm[]): EventBatch | undefined {
+    const acceptedAlarms: Alarm[] = [];
+    for (const rawAlarm of rawAlarms) {
+      const alarm = AlarmSchema.parse(rawAlarm);
+      if (!this.telemetryByDeviceId.has(alarm.deviceId)) continue;
+      const current = this.alarmsById.get(alarm.id);
+      if ((!current && alarm.state !== 'active') || (current && !canTransitionAlarm(current, alarm))) {
+        continue;
+      }
+      if (current && JSON.stringify(current) === JSON.stringify(alarm)) continue;
+      this.alarmsById.set(alarm.id, alarm);
+      acceptedAlarms.push(alarm);
+    }
+    return this.publishEvents(acceptedAlarms.map((alarm) => ({
+      type: 'alarm.upsert' as const,
+      payload: alarm,
+    })));
+  }
+
+  acknowledgeAlarm(alarmId: string, request: AcknowledgeAlarmRequest) {
+    const current = this.alarmsById.get(alarmId);
+    if (!current) return { status: 'not-found' as const };
+    if (current.state === 'resolved') return { status: 'resolved' as const, alarm: current };
+    if (current.state === 'acknowledged') {
+      return { status: 'acknowledged' as const, alarm: current };
+    }
+    const alarm = AlarmSchema.parse({
+      ...current,
+      state: 'acknowledged',
+      updatedAt: request.acknowledgedAt,
+      acknowledgedAt: request.acknowledgedAt,
+      acknowledgedBy: request.acknowledgedBy,
     });
-    for (const listener of this.listeners) listener(batch);
-    return batch;
+    this.publishAlarmUpserts([alarm]);
+    return { status: 'acknowledged' as const, alarm };
   }
 
   generateSimulatorBatch(batchSize = REALTIME_SIMULATOR_BATCH_SIZE) {

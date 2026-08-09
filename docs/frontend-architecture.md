@@ -3,7 +3,7 @@
 Подробный пошаговый путь данных от HTTP/WebSocket до компонентов и deck.gl описан в [`frontend-data-consumption.md`](frontend-data-consumption.md). Взаимодействие `RealtimeClient` и `RealtimeHotStore` разобрано отдельно в [`realtime-client-and-hot-store.md`](realtime-client-and-hot-store.md).
 
 - Актуально на: 2026-08-09
-- Текущий этап: Stage 5, принят 2026-08-09
+- Текущий статус: Stage 6 завершён и принят; Stage 7 не начат
 - Назначение: живое описание реализованного frontend; обновляется при каждом этапе и существенном изменении data flow.
 
 ## Пользовательский результат
@@ -13,7 +13,7 @@ Frontend поддерживает два режима:
 - `Floor` — один из восьми этажей West Riverside Hospital;
 - `Building` — восемь небольших планов рядом и все 18 000 устройств.
 
-В обоих режимах работают pan, wheel/touch zoom, fit, GPU picking и одна карточка выбранного устройства. Панель оператора переключает этажи, ищет по имени/ID, фильтрует по operational status и показывает состояние realtime-соединения с последним применённым sequence.
+В обоих режимах работают pan, wheel/touch zoom, fit, GPU picking и одна карточка выбранного устройства. Кнопка `Alarms` стоит первой в toolbar. Панель оператора переключает этажи, ищет по имени/ID и multi-select фильтрует устройства тремя checkbox-рядами: status, protocol и type. Warning/critical alarms видны отдельным контуром на плане; оператор может отфильтровать lifecycle, перейти к устройству и подтвердить active alarm.
 
 ## Компонентная схема
 
@@ -26,8 +26,9 @@ QueryClientProvider
         │   ├── Zustand: mode, floor, selection, search, filters
         │   ├── useQuery(GET /api/v1/catalog)
         │   ├── raw GET /api/v1/state/snapshot — bootstrap/resync
-        │   └── realtime selector: renderer status only
-        ├── OperatorToolbar — cursor/connection selector
+        │   └── realtime selectors: renderer status + alarms
+        ├── OperatorToolbar — cursor/connection + active alarm count
+        ├── AlarmPanel — filters · locate · acknowledge
         └── FloorScene | BuildingOverview
             ├── scene controller / layer hooks
             ├── architecture layers
@@ -37,10 +38,12 @@ QueryClientProvider
             ├── device layers
             │   ├── IconLayer: normal/offline devices
             │   ├── IconLayer: warning/critical devices, rendered last
-            │   └── TextLayer: selected/LOD labels
+            │   ├── ScatterplotLayer: current selection halo
+            │   └── ScatterplotLayer: unresolved alarm contours
             └── React overlays
                 ├── zoom / fit
                 ├── diagnostics
+                ├── one hover device tooltip
                 └── one DeviceCard — selected-device telemetry selector
 ```
 
@@ -65,7 +68,7 @@ WS   /api/v1/realtime   -> ordered event.batch -> indexed hot state
 
 ### Stable device catalog
 
-`DeviceMetadata` содержит имя, тип, протокол, floor-local позицию, provenance, binding и capabilities. Status намеренно отсутствует. React Query кеширует floor-scoped или building-scoped ответ 5 минут; pan/zoom не перезапрашивает каталог.
+`DeviceMetadata` содержит имя, тип, протокол, floor-local позицию, provenance, binding и capabilities. Status намеренно отсутствует. Stage 6 постоянно кеширует building catalog 5 минут, а floor scope вычисляет локально. Это позволяет `AlarmPanel` перейти к устройству любого этажа без дополнительного запроса; pan/zoom и telemetry/alarm events каталог не перезапрашивают.
 
 ### Stage 5 realtime hot state
 
@@ -100,7 +103,7 @@ flowchart LR
 |---|---|---|
 | Floors, catalog, overview scenes | TanStack Query | стабильные или повторно используемые серверные документы, cache/dedup/stale policy |
 | Bootstrap/resync snapshot | `useRealtimeBootstrap` / `RealtimeClient` | прямой abortable HTTP request сразу заменяет hot store; отдельного stale query cache нет |
-| Mode, selected floor/device, search, filters | Zustand `operator-store` | общее UI-состояние без prop drilling |
+| Mode, selected floor/device, search/device/alarm filters, panel | Zustand `operator-store` | общее UI-состояние без prop drilling |
 | Camera `viewState`, текущая floor scene | `useFloorScene` / `BuildingOverview` | локальное высокочастотное состояние renderer |
 | Indexed hot state и realtime cursor | `RealtimeHotStore` + `useSyncExternalStore` selectors | O(1) lookup и изолированные React subscriptions |
 | Filtered device array | `useOperatorWorkspaceModel` memoized selector | один массив данных для GPU layers |
@@ -127,7 +130,7 @@ flowchart TD
     BuildingCamera --> Overview
 ```
 
-Catalog меняет scope между выбранным этажом и зданием. Hot snapshot и realtime cursor остаются building-scoped, чтобы фильтрация событий по этажу не создавала ложных sequence gaps. При смене этажа выбранное устройство сбрасывается. Filters меняют массив instances deck.gl, но не создают DOM-маркер на устройство.
+Catalog, hot snapshot и realtime cursor остаются building-scoped. Workspace локально выбирает устройства текущего этажа, чтобы переход из building-wide alarm list был мгновенным и чтобы фильтрация событий по этажу не создавала ложных sequence gaps. При обычной смене этажа выбранное устройство сбрасывается. Filters меняют массив instances deck.gl, но не создают DOM-маркер на устройство.
 
 ### Точки взаимодействия TanStack Query и Zustand
 
@@ -137,14 +140,13 @@ Catalog меняет scope между выбранным этажом и зда�
 OperatorToolbar event
         │
         ▼
-Zustand: viewMode / selectedFloorId / filters / selectedDeviceId
+Zustand: viewMode / selectedFloorId / filter arrays / selectedDeviceId / alarm panel
         │
-        ├── viewMode + selectedFloorId -> floorIds -> catalog queryKey
+        ├── building catalog queryKey ──────────┐
         │                                      │
+        ├── viewMode + selectedFloorId ────────┤
         │                                      ▼
-        │                            catalog data
-        │                                      │
-        ├── search/type/protocol/status filters┘
+        ├── search + type/protocol/status sets -> filteredDevices
         │                    │
         │                    ▼
         │             filteredDevices
@@ -155,17 +157,27 @@ Zustand: viewMode / selectedFloorId / filters / selectedDeviceId
 | Место | Данные TanStack Query | Состояние Zustand | Результат взаимодействия |
 |---|---|---|---|
 | `App.tsx` | `floorsQuery.data` | `viewMode`, `selectedFloorId` | выбранный этаж и заголовок приложения |
-| `use-operator-workspace.ts`, scope | загруженный список `floors` | `viewMode`, `selectedFloorId` | `floorIds` только для catalog query key; snapshot/realtime остаётся building-scoped |
+| `use-operator-workspace.ts`, scope | building catalog и список `floors` | `viewMode`, `selectedFloorId` | локальный floor subset без смены catalog query key; snapshot/realtime также building-scoped |
 | `use-operator-workspace.ts`, initialization | первый элемент `floors` | `setSelectedFloorId` | первый загруженный этаж становится выбранным, если выбор ещё не сделан |
 | `use-operator-workspace.ts`, filtering | `catalogQuery.data.devices`; status selector из hot store | `search`, type/protocol/status filters | единый `filteredDevices`; status updates пересчитывают его только при активном status filter |
 | `use-operator-workspace.ts`, selection | `catalogQuery.data.devices` | `selectedDeviceId` | поиск полного `selectedDevice`; canvas click записывает ID через `setSelectedDeviceId` |
-| `OperatorWorkspace.tsx`, composition | готовые `isLoading`/`requestError`/data из view model | `viewMode` внутри view model | loading/error UI и выбор `FloorScene` либо `BuildingOverview` |
+| `OperatorWorkspace.tsx`, composition | готовые `isLoading`/`requestError`/data из view model | `viewMode` и alarm panel state | loading/error UI, выбор renderer и building-wide `AlarmPanel` |
 
-Operational snapshot больше не имеет query key: `operator-queries.ts` содержит только `['device-catalog', scope]`, а overview scenes используют `['overview-scene', floorId, zoomBand]`. Search и filters намеренно не входят в query key, потому что это локальные UI-преобразования уже загруженного документа. `selectedDeviceId` также хранится только в Zustand: в серверный кеш попадает устройство, но не пользовательский выбор.
+Operational snapshot больше не имеет query key: `operator-queries.ts` использует `['device-catalog', 'building']`, а overview scenes — `['overview-scene', floorId, zoomBand]`. Search, floor selection и filters намеренно не входят в query key, потому что это локальные UI-преобразования уже загруженного документа. `selectedDeviceId` и alarm panel filters также хранятся только в Zustand.
 
 Чистое правило фильтрации находится в `operator-devices.ts`. Хук передаёт ему catalog, status index и текущие Zustand filters, поэтому комбинации search/type/protocol/status тестируются отдельно от React Query и store lifecycle.
 
 На следующих этапах этот раздел обновляется при любом изменении query keys, cache/stale policy, состава Zustand/hot store, правил scope или client-side filtering/selection.
+
+## Stage 6 alarm consumption
+
+`alarmsById` приходит из authoritative snapshot и обновляется полным `alarm.upsert` в общем ordered stream. `AlarmPanel` подписывается на identity этой map и `statusByDeviceId`, а чистые selectors сортируют lifecycle в порядке `active → acknowledged → resolved`, фильтруют severity/state и выбирают один strongest unresolved alarm на устройство. Stable type/protocol берутся из building catalog по `deviceId`, текущий status — из hot store.
+
+Подтверждение выполняет `POST /api/v1/alarms/:alarmId/acknowledge` с mock actor `demo-operator` и клиентским UTC timestamp. Runtime-проверенный HTTP response сразу reconciles `alarmsById`, но не двигает WebSocket cursor. Сервер одновременно публикует тот же record как sequenced `alarm.upsert`; повторная запись идемпотентна, а stream sequence применяется обычным путём.
+
+План не выводит alarm как DOM marker и не подменяет им telemetry status. `alarm-layers.ts` создаёт отдельный instanced `ScatterplotLayer` из unresolved alarms: active warning/critical различаются цветом, acknowledged получает приглушённый контур, resolved остаётся только в истории списка. Marker data строится по полному floor/building scope и поэтому не исчезает из-за search/device filters.
+
+`Locate` находит metadata в building catalog, одним Zustand transition переключает floor mode, выбирает этаж и устройство и очищает device filters. Alarm panel остаётся открытым слева, а карточка устройства появляется справа, поэтому оператор сохраняет контекст списка. На узком экране overlays делят сцену по вертикали. Карточка читает alarms и telemetry независимо и показывает audit author/time после acknowledgement. `DeviceVisualMarkers` даёт toolbar filters, alarm rows и selected-device card единый визуальный язык: atlas icon типа, краткий protocol badge и цветной квадрат текущего telemetry status; severity/state аварии при этом остаются отдельными признаками.
 
 ## Floor и building rendering
 
@@ -173,12 +185,14 @@ Operational snapshot больше не имеет query key: `operator-queries.t
 
 - `FloorScene` — тонкая JSX-композиция без загрузки данных и конструирования deck.gl layers в render body;
 - `useFloorScene` владеет камерой, auto-fit, debounced/abortable scene query и GPU picking;
-- `useFloorSceneLayers` вычисляет LOD labels, делит features по geometry type и создаёт architecture/device layers;
+- `useFloorSceneLayers` делит features по geometry type и создаёт architecture/device/alarm/selection layers;
 - fit вычисляется из bounds выбранного этажа;
 - архитектура запрашивается по реальному bbox камеры;
 - отфильтрованные устройства передаются в два instanced `IconLayer`;
+- unresolved alarms текущего этажа передаются в отдельный `ScatterplotLayer` независимо от device filters;
 - picking ограничен device layer IDs;
 - карточка показывается только для устройства текущего этажа.
+- нижний status overlay разделяет geometry и device/zoom metrics на две строки; полупрозрачный фон с blur сохраняет читаемость, не перехватывая события сцены.
 
 ### BuildingOverview
 
@@ -186,6 +200,7 @@ Operational snapshot больше не имеет query key: `operator-queries.t
 - floor-local координаты временно смещаются на layout offset;
 - архитектура восьми этажей объединяется по типам в общие layers;
 - все 18 000 устройств остаются WebGL instances, а не React-компонентами;
+- unresolved alarms всех этажей получают те же layout offsets, что их устройства;
 - fit охватывает общий layout; pan/zoom и picking используют одну `OrthographicView`.
 
 ### Композиция WebGL-слоёв
@@ -195,6 +210,7 @@ flowchart TB
     SceneFeatures["scene.features"]
     Devices["filtered devices"]
     Telemetry["status by deviceId"]
+    Alarms["unresolved alarm by deviceId"]
 
     SceneFeatures --> Polygons["PolygonLayer<br/>floor shell · zones"]
     SceneFeatures --> Paths["PathLayer<br/>walls · doors · windows"]
@@ -204,14 +220,19 @@ flowchart TB
     Devices --> Priority["IconLayer<br/>warning · critical"]
     Telemetry --> Normal
     Telemetry --> Priority
-    Devices --> DeviceLabels["TextLayer<br/>selected and LOD labels"]
+    Devices --> Selection["ScatterplotLayer<br/>selected halo"]
+    Devices --> Hover["one React tooltip<br/>only on pointer hover"]
+    Devices --> AlarmContours["ScatterplotLayer<br/>alarm contours"]
+    Alarms --> AlarmContours
 
     Polygons --> Composition["OrthographicView composition"]
     Paths --> Composition
     SceneLabels --> Composition
     Normal --> Composition
     Priority --> Composition
-    DeviceLabels --> Composition
+    Selection --> Composition
+    Hover --> Composition
+    AlarmContours --> Composition
 ```
 
 Порядок слоёв существенен: warning/critical `IconLayer` идёт после обычного device layer, поэтому при визуальном пересечении приоритетные состояния остаются сверху.
@@ -233,7 +254,7 @@ user input / Fit
    ├── visible world bbox
    ├── backend architecture LOD
    ├── device icon size/status emphasis
-   └── device label policy
+   └── fixed-pixel device and selection marker size
 ```
 
 Architecture bands:
@@ -244,24 +265,21 @@ Architecture bands:
 
 Обычная device icon имеет размер 7/10/14 px по диапазонам zoom. Warning — 11/14/17 px, critical — 13/16/19 px. Warning/critical instances выделены в отдельный слой, рисуются поверх остальных и не исчезают из-за renderer LOD. Offline/normal остаются в основном слое.
 
-Подписи ограничены, чтобы не создать визуальный и CPU-шум:
+Device name labels не размножаются при приближении. На сцене существует максимум один React tooltip — только для instance непосредственно под курсором; он показывает name, type, operational status и этаж. Tooltip исчезает при уходе курсора и не перехватывает pointer events. Выбранное устройство вместо постоянной подписи получает независимый 17 px cyan/white halo под icon, одинаковый во всех zoom и в обоих renderer. Архитектурные подписи по-прежнему регулируются scene LOD.
 
-- выбранное устройство подписано всегда;
-- warning/critical в floor mode подписываются со среднего приближения;
-- обычные подписи появляются только при zoom `>= 5.2`, только внутри viewport и максимум 180 одновременно;
-- архитектурные подписи продолжают регулироваться scene LOD.
+## Search и multi-select filters
 
-Пороги, лимит и device layer IDs централизованы в `floor-scene-config.ts`; чистая функция `selectFloorDeviceLabels` в `floor-scene-labels.ts` реализует выбор подписей. Хук слоёв отвечает только за memoization и передачу результата в `TextLayer`.
+Поиск case-insensitive по `device.name` и `device.id`. Type и protocol сравниваются со stable catalog; status — с отдельным hot status map. Для каждой категории Zustand хранит массив выбранных значений. Внутри одной строки значения объединяются как OR, три категории и search — как AND. Пустая категория даёт пустой результат; отсутствие telemetry трактуется как `unknown`.
 
-## Search и filters
+Toolbar имеет основную строку и три горизонтальных checkbox-ряда. Каждый ряд начинается sticky master-checkbox: все значения дают `checked`, часть — нативный `indeterminate`, отсутствие — `unchecked`; клик по mixed/none выбирает всё, клик по all снимает всё. Status использует цветные квадраты из renderer palette, protocol — короткие цветные badges, type — соответствующий glyph из общего device atlas. Все 19 значений `DeviceTypeSchema` имеют уникальный 32×32 atlas slot; `deviceIconOrder` одновременно строит deck.gl `iconMapping` и CSS background position для filters/cards, поэтому отдельного расходящегося mapping в React-компонентах нет. Длинный type row прокручивается горизонтально и не переносится в облако контролов.
 
-Поиск case-insensitive по `device.name` и `device.id`. Type и protocol сравниваются со stable catalog; status — с отдельным hot status map. Фильтры применяются до передачи данных в deck.gl, поэтому counters, status overlay, labels и picking работают с одним и тем же видимым набором.
+Фильтры применяются до передачи данных в deck.gl, поэтому counter, status overlay, hover picking и click picking работают с одним и тем же видимым набором.
 
 `Reset` очищает search/type/protocol/status, не меняя mode и выбранный этаж.
 
 ## Selection и GPU picking
 
-Клик по canvas вызывает `DeckGLRef.pickObject()` с radius 4 и только с device layer IDs. Возвращённый instance преобразуется в `deviceId`, который хранится в Zustand. React создаёт ровно одну `DeviceCard`; её selector подписан на telemetry object только выбранного `deviceId`, поэтому updates других устройств не вызывают render карточки.
+Hover использует штатный deck.gl picking и создаёт ровно один `SceneDeviceTooltip`. Клик по canvas вызывает `DeckGLRef.pickObject()` с radius 4 и только с device layer IDs. Возвращённый instance преобразуется в `deviceId`, который хранится в Zustand и отображается отдельным selection halo. React создаёт ровно одну `DeviceCard`; её selector подписан на telemetry object только выбранного `deviceId`, поэтому updates других устройств не вызывают render карточки.
 
 ## Основные frontend-файлы
 
@@ -269,43 +287,51 @@ Architecture bands:
 |---|---|
 | `src/client/src/App.tsx` | shell, floors query, заголовок режима |
 | `src/client/src/OperatorWorkspace.tsx` | декларативная композиция toolbar и выбранного renderer |
-| `src/client/src/use-operator-workspace.ts` | catalog scope, status selectors, filters, selection view model |
+| `src/client/src/use-operator-workspace.ts` | building catalog, local floor scope, status/alarm selectors и selection view model |
 | `src/client/src/operator-devices.ts` | чистая фильтрация catalog по search/type/protocol/status |
 | `src/client/src/operator-store.ts` | UI state на Zustand |
 | `src/client/src/operator-api.ts` | catalog, bootstrap и resync clients + Zod parse |
+| `src/client/src/AlarmPanel.tsx` | building alarm list, filters, navigation и acknowledge action |
+| `src/client/src/DeviceVisualMarkers.tsx` | общие type icon, protocol badge и telemetry-status square для filters, alarm rows и карточки |
+| `src/client/src/alarm-model.ts` | чистые lifecycle filters/counts и marker selection |
+| `src/client/src/alarm-layers.ts` | общая фабрика alarm `ScatterplotLayer` двух renderer |
 | `src/client/src/operator-queries.ts` | stable catalog React Query key/cache policy |
 | `src/client/src/realtime-hot-store.ts` | indexed hot state, sequence/revision checks, dirty renderer state |
 | `src/client/src/realtime-client.ts` | WebSocket lifecycle, resume, reconnect и resync |
 | `src/client/src/use-realtime-state.ts` | raw abortable snapshot bootstrap, client lifecycle и selective `useSyncExternalStore` subscriptions |
-| `src/client/src/OperatorToolbar.tsx` | mode/floor/search/filter controls + live cursor |
+| `src/client/src/OperatorToolbar.tsx` | mode/floor/search/filter controls + live cursor и active alarm count |
+| `src/client/src/OperatorFilterRows.tsx` | три checkbox-ряда, semantic markers и tri-state master controls |
 | `src/client/src/FloorScene.tsx` | декларативная композиция floor renderer и overlays |
 | `src/client/src/use-floor-scene.ts` | camera, fit, scene request lifecycle и GPU picking |
-| `src/client/src/use-floor-scene-layers.ts` | floor architecture/device layers и label LOD |
-| `src/client/src/floor-scene-config.ts` | layer IDs, debounce и label LOD thresholds/limit |
-| `src/client/src/floor-scene-labels.ts` | чистый выбор device labels для текущих zoom и viewport |
+| `src/client/src/use-floor-scene-layers.ts` | floor architecture/device/alarm/selection layers |
+| `src/client/src/floor-scene-config.ts` | device layer IDs и scene request debounce |
+| `src/client/src/SceneDeviceTooltip.tsx` | единственный hover-tooltip с clamped screen position |
+| `src/client/src/selection-layers.ts` | общий заметный selection halo двух renderer |
 | `src/client/src/BuildingOverview.tsx` | layout и rendering всех этажей |
-| `src/client/src/DeviceCard.tsx` | selected device metadata + live telemetry selector |
+| `src/client/src/DeviceCard.tsx` | selected device metadata + live telemetry/alarm selectors |
 | `src/client/src/SceneControls.tsx` | общие zoom/fit controls двух renderer |
 | `src/client/src/device-layers.ts` | общие status partition и фабрика device `IconLayer` |
-| `src/client/src/device-visuals.ts` | atlas mapping, status colors, icon LOD |
+| `src/client/src/device-visuals.ts` | contract-complete 1:1 type/atlas mapping, status colors, icon LOD |
+| `src/client/public/device-atlas.svg` | 19 уникальных 32×32 glyph slots в порядке `DeviceTypeSchema.options` |
 | `src/client/src/scene-visuals.ts` | scene colors и zoom bands |
 | `src/client/src/scene-empty-state.ts` | перевод contract empty reason в операторскую диагностику |
 | `src/client/src/viewport.ts` | floor/building fit и bbox conversion |
 
 ## Тестовые границы
 
-- Чистые unit-тесты фиксируют status partition, dirty data ranges, поиск и комбинации filters, label zoom thresholds, viewport culling, deduplication и лимит 180.
+- Чистые unit-тесты фиксируют уникальный atlas slot для каждого contract device type, status partition, dirty data ranges, поиск/filter combinations, hover-tooltip content/clamping и параметры selection halo.
 - Hot-store/client tests фиксируют direct HTTP bootstrap, atomic snapshot replacement, contiguous batches, stale revisions, gaps, resync, reconnect backoff и одно notification на batch.
 - Selector component test доказывает, что update другого устройства не рендерит consumer выбранного устройства.
 - Hook-тест `useFloorScene` с fake timers фиксирует 100 мс debounce, bbox/zoom request и abort устаревшего запроса при смене камеры.
 - Scene contract/API tests фиксируют обязательный base shell и три причины успешного пустого ответа; UI unit-тест фиксирует соответствующие сообщения.
 - Chromium E2E проверяет рост live cursor вместе с floor switch, filters, overview, zoom, GPU picking и live device card.
+- Alarm selector/component tests проверяют severity/state filters, device type/protocol/status markers, priority marker selection, acknowledge reconciliation и atomic navigation; Chromium проходит полный acknowledge/locate workflow и проверяет markers в списке и выбранной карточке.
 
 ## Ограничения и следующий шаг
 
-- Catalog передаётся целиком для выбранного floor/building scope, а authoritative hot snapshot — для здания; device spatial culling/clustering не добавлялись без benchmark.
+- Catalog и authoritative hot snapshot передаются для здания; локальный floor subset не требует сети. Device spatial culling/clustering не добавлялись без benchmark.
 - Overview делает до восьми scene queries на новый zoom band; ответы кешируются, но пока не объединены в отдельный backend batch endpoint.
 - Главный JS chunk около 1 МБ minified из-за deck.gl; code splitting оставлен как измеряемая оптимизация, а не блокер MVP.
 - Browser-level forced disconnect/resync пока покрыт детерминированными client/API tests; Chromium acceptance проверяет штатный live stream.
 
-Stage 6 добавит alarm UI и lifecycle поверх уже реализованных `alarmsById` и `alarm.upsert`, не смешивая аварии с telemetry status.
+Stage 7 добавит simulated command lifecycle поверх отдельного `commandsById`, не смешивая desired command state с telemetry или alarms.

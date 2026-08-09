@@ -72,4 +72,14 @@ The convex hull of all prepared architectural feature coordinates is an intentio
 
 ## A-016 Building-scoped realtime cursor
 
-Stage 5 uses one monotonically increasing stream and replay cursor for the whole building. The frontend therefore bootstraps the complete building hot snapshot even while the stable catalog is floor-scoped. The server sends complete building batches rather than removing events for unselected floors, because filtering a globally sequenced batch would create false gaps. A future per-floor sharding design must introduce independent stream IDs/cursors instead of reusing this global sequence.
+Stage 5 uses one monotonically increasing stream and replay cursor for the whole building. The frontend therefore bootstraps the complete building hot snapshot; Stage 6 also keeps the stable catalog building-scoped for alarm navigation. The server sends complete building batches rather than removing events for unselected floors, because filtering a globally sequenced batch would create false gaps. A future per-floor sharding design must introduce independent stream IDs/cursors instead of reusing this global sequence.
+
+## A-017 Stage 6 alarm fixture
+
+Stage 6 seeds four deterministic simulated alarms per floor so every lifecycle state and both warning/critical severities are visible without a physical alarm source. These records demonstrate UI and lifecycle behavior only; telemetry status does not automatically create or resolve an alarm. Production detection rules, persistence, durable audit history and trusted operator identity remain out of scope.
+
+The frontend sends the explicit mock actor ID `demo-operator` and a browser UTC timestamp for acknowledgement. Per A-007 this is not a trusted identity claim. The server owns lifecycle validation and emits the accepted record through the ordered realtime stream.
+
+## A-018 Building catalog for alarm navigation
+
+Stage 6 keeps the 18,000-device stable catalog building-scoped in the browser and derives the selected floor locally. This intentionally trades a larger cache document for immediate navigation from a building-wide alarm list without request races. Pagination, floor indexes or on-demand metadata can replace this after Stage 10 measurements without changing alarm/device IDs.

@@ -25,6 +25,8 @@ Level 1 now renders its 2,900 stable device records over the prepared architectu
 - Device selection uses `DeckGLRef.pickObject()` against only `floor-devices`, with a 4 px pick radius.
 - The selected device is highlighted and represented by one React card with identity, protocol, provenance, position, and capability counts.
 
+> Post-stage note (2026-08-09): Stage 6 replaced the original eight-family many-to-one mapping with 19 unique glyphs, one per `DeviceTypeSchema` option. Instanced `IconLayer`, same-origin SVG atlas and GPU picking boundaries remain unchanged; see `reports/stage-six.md`.
+
 ## State boundary
 
 Only stable `DeviceMetadata` is loaded. Telemetry, connection, warning/critical status, alarms, and commands are not added to catalog objects. Selection is a single UI state reference; no complete device array is recreated for a selection change.

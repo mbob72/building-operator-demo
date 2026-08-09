@@ -15,7 +15,8 @@ These are project guardrails, not assumptions that every optimization is needed.
 ## Device rendering
 
 - Start with one deck.gl `IconLayer` for the relevant device population and use its instanced rendering.
-- Use a texture atlas for device categories rather than separate image elements or draw calls per icon.
+- Use one texture atlas with a unique slot for every contract `DeviceType`, rather than separate image elements or draw calls per icon.
+- Derive both deck.gl `iconMapping` and React marker background positions from the same ordered type list; filters, cards and the map must never maintain independent type-to-glyph tables.
 - Keep the number of layers/draw calls small. Split layers only when visual behavior or update cadence differs materially.
 - Use GPU picking for ordinary point selection.
 - Do not introduce per-device event handlers or JSX.

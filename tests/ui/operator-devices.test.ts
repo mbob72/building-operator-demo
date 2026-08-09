@@ -1,12 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import { filterDevices } from '../../src/client/src/operator-devices';
+import {
+  DeviceProtocolSchema,
+  DeviceStatusSchema,
+  DeviceTypeSchema,
+} from '../../src/shared/domain-contracts';
 import { makeDevice } from './device-fixtures';
 
 const noFilters = {
   search: '',
-  type: 'all',
-  protocol: 'all',
-  status: 'all',
+  types: DeviceTypeSchema.options,
+  protocols: DeviceProtocolSchema.options,
+  statuses: DeviceStatusSchema.options,
 } as const;
 
 describe('operator device filtering', () => {
@@ -42,15 +47,16 @@ describe('operator device filtering', () => {
   it('combines type, protocol and telemetry status filters', () => {
     expect(filterDevices(devices, statuses, {
       search: 'north',
-      type: 'hvac-unit',
-      protocol: 'bacnet',
-      status: 'warning',
+      types: ['hvac-unit'],
+      protocols: ['bacnet'],
+      statuses: ['warning'],
     })).toEqual([devices[0]]);
   });
 
-  it('does not match a status filter when telemetry is missing', () => {
-    expect(filterDevices(devices, statuses, { ...noFilters, status: 'unknown' }))
-      .toEqual([]);
+  it('treats missing telemetry as unknown and supports empty selections', () => {
+    expect(filterDevices(devices, statuses, { ...noFilters, statuses: ['unknown'] }))
+      .toEqual([devices[2]]);
+    expect(filterDevices(devices, statuses, { ...noFilters, types: [] })).toEqual([]);
     expect(filterDevices(devices, statuses, noFilters)).toEqual(devices);
   });
 });

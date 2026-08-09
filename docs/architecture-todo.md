@@ -8,7 +8,42 @@
 
 Нет.
 
+### Проверка на границе Stage 6
+
+Проведена 2026-08-09; Stage 6 принят пользователем. Новых незакрытых архитектурных дефектов не выявлено. In-memory alarm persistence, mock actor identity и отсутствие production detector/audit storage зафиксированы как осознанные границы MVP в `docs/assumptions.md` и `reports/stage-six.md`, а не как забытые дефекты текущего этапа. Последующий UX review обнаружил many-to-one device icon mapping; он закрыт как `ARCH-002` с общей contract-derived таблицей и автоматическими проверками.
+
 ## Закрытые пункты
+
+### ARCH-002 — Уникальное визуальное соответствие DeviceType
+
+- Статус: `closed` 2026-08-09
+- Обнаружено: Stage 6 UX review
+- Области: domain contract, SVG atlas, deck.gl device layers, toolbar filters, alarm/device cards
+
+#### Проблема
+
+В контракте существует 19 типов устройств, но исходный atlas содержал восемь обобщённых семейств. Несколько разных типов (`presence-sensor`, `temperature-sensor`, `co2-sensor`; fire equipment; controls) получали одинаковые glyphs. React markers дополнительно держали собственный список восьми slots, поэтому соответствие карты и UI зависело от двух параллельных таблиц.
+
+#### Реализованное решение
+
+`DeviceIcon` теперь совпадает с `DeviceType`. Порядок slots берётся непосредственно из `DeviceTypeSchema.options`; из него строятся deck.gl `iconMapping` и CSS background position. SVG atlas содержит 19 уникальных 32×32 glyphs. Filters, alarm rows и selected card используют общий `DeviceTypeIcon`, а карта получает тот же key через `iconForDevice`.
+
+#### Критерии закрытия
+
+- [x] Каждый contract `DeviceType` имеет отдельный atlas slot и отличающийся glyph.
+- [x] Карта и React markers используют один contract-derived порядок.
+- [x] Unit test проверяет полноту, уникальность и координаты mapping.
+- [x] Component test проверяет 19 разных background positions в type filters.
+- [x] Chromium E2E сравнивает type и atlas position между alarm row и selected card.
+- [x] Обновлены центральная/frontend/data-consumption архитектура, rendering guidelines, Stage 6 report, Release Notes и README.
+
+#### Связанные места
+
+- `src/shared/domain-contracts.ts` — `DeviceTypeSchema`.
+- `src/client/src/device-visuals.ts` — единый order/mapping для deck.gl.
+- `src/client/src/DeviceVisualMarkers.tsx` — общий React marker.
+- `src/client/public/device-atlas.svg` — 19 уникальных glyphs.
+- `tests/ui/device-visuals.test.ts` и `tests/ui/operator-filter-rows.test.tsx` — regression checks.
 
 ### ARCH-001 — Гарантировать непустую базовую геометрию для LOD
 

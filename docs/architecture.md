@@ -26,6 +26,7 @@ flowchart LR
         CatalogAPI["GET /api/v1/catalog"]
         SnapshotAPI["GET /api/v1/state/snapshot"]
         RealtimeAPI["WS /api/v1/realtime"]
+        AckAPI["POST alarm acknowledge"]
 
         SceneRepo --> FloorsAPI
         SceneRepo --> SceneAPI
@@ -33,6 +34,7 @@ flowchart LR
         CatalogRepo --> RealtimeEngine
         RealtimeEngine --> SnapshotAPI
         RealtimeEngine --> RealtimeAPI
+        RealtimeEngine --> AckAPI
     end
 
     subgraph Frontend["React frontend"]
@@ -43,6 +45,7 @@ flowchart LR
         Renderers["FloorScene / BuildingOverview"]
         Deck["deck.gl layers"]
         Card["Selected DeviceCard"]
+        AlarmPanel["AlarmPanel"]
 
         Query --> Workspace
         Store --> Workspace
@@ -50,14 +53,17 @@ flowchart LR
         Workspace --> Renderers
         Renderers --> Deck
         Renderers --> Card
+        Hot --> AlarmPanel
+        Store --> AlarmPanel
     end
 
     Scenes --> SceneRepo
     CatalogFile --> CatalogRepo
     FloorsAPI --> Query
     CatalogAPI --> Query
-    SnapshotAPI --> Query
+    SnapshotAPI --> Hot
     RealtimeAPI --> Hot
+    AlarmPanel --> AckAPI
     SceneAPI --> Renderers
 ```
 
@@ -159,3 +165,15 @@ Stage 5 preserves the eight scene/catalog flows and replaces the read-only statu
 Selective subscriptions isolate update domains: toolbar observes connection/cursor, `DeviceCard` observes one telemetry record, and renderers observe status versions/dirty IDs. Value-only telemetry does not rebuild device layers. Status-only changes use deck.gl dirty ranges unless they change normal/priority layer membership.
 
 Stage 4 post-acceptance geometry hardening adds one generated convex-hull `floor-shell` per prepared floor. It is visible across the complete supported zoom range `[-8, 24]` and its bbox covers every other feature bbox. Successful empty scene responses expose `meta.emptyReason`, distinguishing a viewport outside floor bounds, an in-floor viewport without spatial candidates, and candidates removed by LOD.
+
+## Stage 6 implementation boundary
+
+Stage 6 activates the existing alarm contracts without coupling alarms to telemetry status. Deterministic demo alarms seed the in-memory engine; authoritative snapshots scope them through device membership, and complete lifecycle records travel as `alarm.upsert` in the existing building sequence/replay.
+
+The acknowledge REST mutation is idempotent and is the only frontend write path for alarm state. Its response is reconciled into the hot store without advancing the socket cursor; the corresponding realtime event later advances the cursor normally. `resolved` is terminal, audit author/time is retained, and production identity remains outside MVP.
+
+Frontend alarm filters/panel state belongs to Zustand, alarm records belong to `RealtimeHotStore`, stable locations belong to the TanStack-cached building catalog, and plan contours belong to a separate deck.gl `ScatterplotLayer`. Device search/status filters never hide unresolved alarm contours. `Locate` switches floor and selection atomically; no per-alarm React marker is created on the plan.
+
+Device names также не создаются как массовые `TextLayer` labels на detail zoom. Deck picking владеет единственным hover-tooltip, а текущий `selectedDeviceId` визуализируется отдельным fixed-pixel halo; selection остаётся заметным без засорения карты текстом.
+
+Device type visual identity имеет строгое соответствие 1:1 с `DeviceTypeSchema`: все 19 contract types занимают отдельные slots общего SVG atlas. deck.gl layers, toolbar filters, alarm rows и selected-device card используют один `deviceIconOrder`/`iconMapping`; отдельные component-level таблицы соответствий запрещены, чтобы тип не менял glyph между картой и UI.

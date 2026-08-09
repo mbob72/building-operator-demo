@@ -1,7 +1,12 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { CatalogResponseSchema, StateSnapshotSchema } from '../../src/shared/api-contracts';
+import {
+  AcknowledgeAlarmResponseSchema,
+  CatalogResponseSchema,
+  StateSnapshotSchema,
+} from '../../src/shared/api-contracts';
 import { FloorSummarySchema, SceneResponseSchema } from '../../src/shared/scene-contracts';
 import { buildApp } from '../../src/server/app';
+import { RealtimeEngine } from '../../src/server/realtime-engine';
 
 const apps: ReturnType<typeof buildApp>[] = [];
 const createApp = () => {
@@ -221,6 +226,14 @@ describe('status snapshot API', () => {
     expect(snapshot.sequence).toBe(0);
     expect(snapshot.telemetry.some((item) => item.status === 'warning')).toBe(true);
     expect(snapshot.telemetry.some((item) => item.status === 'critical')).toBe(true);
+    expect(snapshot.alarms).toHaveLength(4);
+    expect(new Set(snapshot.alarms.map((alarm) => alarm.severity)))
+      .toEqual(new Set(['warning', 'critical']));
+    expect(new Set(snapshot.alarms.map((alarm) => alarm.state)))
+      .toEqual(new Set(['active', 'acknowledged', 'resolved']));
+    expect(snapshot.alarms.every((alarm) => (
+      snapshot.telemetry.some((telemetry) => telemetry.deviceId === alarm.deviceId)
+    ))).toBe(true);
     expect(snapshot.telemetry.every((item) => (
       item.connection !== 'offline' || item.status === 'offline'
     ))).toBe(true);
@@ -253,5 +266,66 @@ describe('status snapshot API', () => {
     expect(full.statusCode).toBe(200);
     expect(StateSnapshotSchema.parse(full.json()).telemetry).toHaveLength(18_000);
     expect(missing.statusCode).toBe(404);
+  });
+});
+
+describe('alarm API', () => {
+  it('acknowledges an active alarm and returns the updated contract', async () => {
+    const engine = new RealtimeEngine();
+    const app = buildApp({ realtimeEngine: engine });
+    apps.push(app);
+    const initial = engine.snapshot(['west-riverside-level-1']).alarms
+      .find((alarm) => alarm.state === 'active')!;
+
+    const response = await app.inject({
+      method: 'POST',
+      url: `/api/v1/alarms/${initial.id}/acknowledge`,
+      payload: {
+        acknowledgedBy: 'demo-operator',
+        acknowledgedAt: '2026-08-09T12:00:00.000Z',
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(AcknowledgeAlarmResponseSchema.parse(response.json()).alarm).toMatchObject({
+      id: initial.id,
+      state: 'acknowledged',
+      acknowledgedBy: 'demo-operator',
+    });
+    expect(engine.latestSequence).toBe(1);
+  });
+
+  it('rejects invalid, missing, and already resolved alarm acknowledgements', async () => {
+    const engine = new RealtimeEngine();
+    const app = buildApp({ realtimeEngine: engine });
+    apps.push(app);
+    const resolved = engine.snapshot(['west-riverside-level-1']).alarms
+      .find((alarm) => alarm.state === 'resolved')!;
+
+    const invalid = await app.inject({
+      method: 'POST',
+      url: `/api/v1/alarms/${resolved.id}/acknowledge`,
+      payload: { acknowledgedBy: '' },
+    });
+    const missing = await app.inject({
+      method: 'POST',
+      url: '/api/v1/alarms/alarm-missing/acknowledge',
+      payload: {
+        acknowledgedBy: 'demo-operator',
+        acknowledgedAt: '2026-08-09T12:00:00.000Z',
+      },
+    });
+    const conflict = await app.inject({
+      method: 'POST',
+      url: `/api/v1/alarms/${resolved.id}/acknowledge`,
+      payload: {
+        acknowledgedBy: 'demo-operator',
+        acknowledgedAt: '2026-08-09T12:00:00.000Z',
+      },
+    });
+
+    expect(invalid.statusCode).toBe(400);
+    expect(missing.statusCode).toBe(404);
+    expect(conflict.statusCode).toBe(409);
   });
 });

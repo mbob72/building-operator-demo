@@ -70,4 +70,5 @@ export type CatalogQuery = z.infer<typeof CatalogQuerySchema>;
 export type StateSnapshotQuery = z.infer<typeof StateSnapshotQuerySchema>;
 export type StateSnapshot = z.infer<typeof StateSnapshotSchema>;
 export type AcknowledgeAlarmRequest = z.infer<typeof AcknowledgeAlarmRequestSchema>;
+export type AcknowledgeAlarmResponse = z.infer<typeof AcknowledgeAlarmResponseSchema>;
 export type CreateCommandRequest = z.infer<typeof CreateCommandRequestSchema>;

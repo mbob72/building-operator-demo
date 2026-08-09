@@ -2,8 +2,8 @@
 
 ## Текущий статус
 
-- Текущий этап: **этап 5 завершён и принят 2026-08-09**.
-- Этапы 0–5 завершены и приняты; этап 0 опубликован.
+- Текущий статус: **этап 6 завершён и принят; этап 7 не начат**.
+- Этапы 0–6 завершены и приняты.
 - Разработка ведётся последовательно одним coding agent.
 - Переход между этапами выполняется только после явного апрува пользователя.
 - Количество устройств не является строгой константой `20 000`: нужен репрезентативный набор порядка десятков тысяч, без ухода в игрушечный масштаб около 2 000 или избыточный масштаб около 200 000.
@@ -68,13 +68,15 @@
 
 Реализованы authoritative mutable snapshot, building-scoped WebSocket stream, contiguous sequence, replay window, heartbeat, reconnect/resume и HTTP resync. Hot state индексирован отдельно от TanStack Query и Zustand; selector subscriptions изолируют toolbar, выбранную карточку и renderer status. Value-only batches не пересобирают device layers, а status changes используют dirty deck.gl ranges либо полную перегруппировку только при смене priority membership. Отчёт: `reports/stage-five.md`.
 
-### Этап 6. Аварии
+### Этап 6. Аварии — завершён и принят
 
 - Warning и critical alarm на плане.
 - Состояния `active`, `acknowledged`, `resolved`.
 - Список и фильтрация аварий.
 - Переход к аварийному устройству.
 - Acknowledge с автором и временем.
+
+Реализованы deterministic warning/critical alarm fixtures на восьми этажах, монотонный lifecycle `active → acknowledged → resolved`, idempotent acknowledge REST mutation и `alarm.upsert` в общем realtime stream. Frontend получил building-wide alarm panel, severity/state filters, active counter, переход к устройству, audit author/time, карточку alarms и отдельный instanced plan contour, независимый от telemetry status и device filters. После UX-корректировок `Alarms` стоит первым, device filters представлены тремя multi-select checkbox-рядами с tri-state master controls, а scene использует единственный hover-tooltip и отдельный selection halo без массовых device labels. Все 19 device types имеют уникальные SVG-atlas glyphs; карта, фильтры, строки аварий и карточка выбранного устройства используют единый type mapping, protocol badges и цветные telemetry-status squares. Полный отчёт: `reports/stage-six.md`.
 
 ### Этап 7. Управляющие команды
 

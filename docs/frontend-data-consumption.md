@@ -3,7 +3,7 @@
 Внутренняя работа и граница ответственности двух realtime-классов подробно описана в [`realtime-client-and-hot-store.md`](realtime-client-and-hot-store.md).
 
 - Актуально на: 2026-08-09
-- Текущий этап: Stage 5, принят 2026-08-09
+- Текущий статус: Stage 6 завершён и принят; Stage 7 не начат
 - Назначение: пошаговое описание пути данных от HTTP/WebSocket до React-компонентов и deck.gl layers.
 
 ## Итоговая схема
@@ -18,14 +18,19 @@ POST /api/scene/query
 GET /api/v1/catalog
         → TanStack Query
         → stable DeviceMetadata[]
-        → filters, positions, labels, picking
+        → filters, positions, hover/click picking
 
 GET /api/v1/state/snapshot ──┐
                              ├→ RealtimeHotStore
 WS /api/v1/realtime ─────────┘       │
                                      ├→ renderer status selectors
                                      ├→ toolbar cursor selector
-                                     └→ selected-device telemetry selector
+                                     ├→ selected-device telemetry/alarm selectors
+                                     └→ AlarmPanel + alarm plan layer
+
+POST /api/v1/alarms/:id/acknowledge
+        → validated Alarm response
+        → hot-store reconciliation (cursor unchanged)
 ```
 
 Geometry, stable metadata, hot operational state и UI-only state не объединяются в один transport document или общий frontend store.
@@ -37,16 +42,17 @@ Geometry, stable metadata, hot operational state и UI-only state не объе�
 | Floors, stable catalog, overview scene bands | TanStack Query | стабильные или повторно используемые серверные документы |
 | Authoritative snapshot и live operational state | `RealtimeHotStore` | единый актуальный indexed state без stale query-cache копии |
 | Realtime connection, resume, replay и resync | `RealtimeClient` | transport lifecycle не является React server-state query |
-| Mode, selected floor/device, search и filters | Zustand `operator-store` | UI-only state |
+| Mode, selected floor/device, search/device/alarm filters и panel state | Zustand `operator-store` | UI-only state |
 | Camera, viewport и текущие deck.gl layers | renderer hooks/components | локальное высокочастотное состояние визуализации |
 
 ## 1. HTTP-клиенты
 
-[`operator-api.ts:14`](../src/client/src/operator-api.ts#L14) содержит тонкие transport functions:
+[`operator-api.ts:16`](../src/client/src/operator-api.ts#L16) содержит тонкие transport functions:
 
-- [`loadDeviceCatalog(floorIds, signal)`](../src/client/src/operator-api.ts#L14) вызывает `GET /api/v1/catalog`;
-- [`loadStateSnapshot(floorIds, signal)`](../src/client/src/operator-api.ts#L26) вызывает `GET /api/v1/state/snapshot` для bootstrap;
-- [`loadStateSnapshotPath(path, signal)`](../src/client/src/operator-api.ts#L38) загружает snapshot по пути из `resync.required`.
+- [`loadDeviceCatalog(floorIds, signal)`](../src/client/src/operator-api.ts#L16) вызывает `GET /api/v1/catalog`;
+- [`loadStateSnapshot(floorIds, signal)`](../src/client/src/operator-api.ts#L28) вызывает `GET /api/v1/state/snapshot` для bootstrap;
+- [`loadStateSnapshotPath(path, signal)`](../src/client/src/operator-api.ts#L40) загружает snapshot по пути из `resync.required`.
+- [`acknowledgeAlarm(alarmId, request)`](../src/client/src/operator-api.ts) вызывает mutation endpoint и валидирует `AcknowledgeAlarmResponse`.
 
 Каждый JSON-ответ проходит runtime Zod parsing через `CatalogResponseSchema` или `StateSnapshotSchema`. Невалидный payload не попадает в query cache или hot store.
 
@@ -59,24 +65,20 @@ queryKey: ['device-catalog', scope]
 staleTime: 5 * 60_000
 ```
 
-В floor mode scope содержит выбранный `floorId`; в building overview используется building scope. Pan, zoom и telemetry events не перезапрашивают catalog. `catalog.invalidated` из realtime stream вызывает `invalidateQueries({ queryKey: ['device-catalog'] })`.
+Stage 6 использует building scope в обоих режимах. Выбранный floor вычисляется локально, поэтому alarm navigation не ждёт metadata request. Pan, zoom, telemetry и alarm events не перезапрашивают catalog. `catalog.invalidated` из realtime stream вызывает `invalidateQueries({ queryKey: ['device-catalog'] })`.
 
 Operational snapshot намеренно не имеет TanStack query key. Удалённый `useStateSnapshotQuery` создавал бессрочно кешированную копию, которая устаревала сразу после первого WebSocket batch.
 
-## 3. Workspace определяет catalog scope
+## 3. Workspace определяет локальный floor scope
 
-[`useOperatorWorkspaceModel`](../src/client/src/use-operator-workspace.ts#L8) читает view mode и выбранный этаж из Zustand; scope и запуск bootstrap находятся в [строках 11–13](../src/client/src/use-operator-workspace.ts#L11):
+[`useOperatorWorkspaceModel`](../src/client/src/use-operator-workspace.ts) читает view mode и выбранный этаж из Zustand, загружает building catalog один раз и локально выбирает floor devices:
 
 ```ts
-const floorIds = state.viewMode === 'floor' && selectedFloor
-  ? [selectedFloor.id]
-  : undefined;
-
-const catalogQuery = useDeviceCatalogQuery(floorIds, Boolean(selectedFloor));
+const catalogQuery = useDeviceCatalogQuery(undefined, Boolean(selectedFloor));
 useRealtimeBootstrap(Boolean(selectedFloor));
 ```
 
-Scope влияет только на stable catalog. Hot snapshot и realtime cursor остаются building-scoped. Один building sequence нельзя фильтровать по этажу: удалённые из batch события создали бы ложные sequence gaps.
+`catalogDevices` остаётся полным для building-wide alarm lookup, а `devices` зависит от `viewMode/selectedFloor`. Hot snapshot и realtime cursor также building-scoped. Один building sequence нельзя фильтровать по этажу: удалённые из batch события создали бы ложные sequence gaps.
 
 ## 4. Прямой snapshot bootstrap
 
@@ -98,7 +100,7 @@ Snapshot сначала атомарно заполняет hot store, и тол
 
 ## 5. Индексация snapshot
 
-[`RealtimeHotStore.replaceSnapshot()`](../src/client/src/realtime-hot-store.ts#L84) преобразует transport arrays в lookup indexes. Создание telemetry/status maps находится в [строках 85–90](../src/client/src/realtime-hot-store.ts#L85), atomic publish с cursor и renderer versions — в [строках 91–107](../src/client/src/realtime-hot-store.ts#L91):
+[`RealtimeHotStore.replaceSnapshot()`](../src/client/src/realtime-hot-store.ts#L98) преобразует transport arrays в lookup indexes. Создание telemetry/status maps начинается в [строке 99](../src/client/src/realtime-hot-store.ts#L99), atomic publish с cursor и renderer versions — в [строке 105](../src/client/src/realtime-hot-store.ts#L105):
 
 ```text
 telemetry[] → Map<deviceId, DeviceTelemetry>
@@ -126,7 +128,7 @@ Store также сохраняет:
   "type": "resume",
   "protocolVersion": "1",
   "buildingId": "west-riverside",
-  "streamId": "stage-5-…",
+  "streamId": "stage-6-…",
   "afterSequence": 1200
 }
 ```
@@ -135,7 +137,7 @@ Store также сохраняет:
 
 ## 7. Проверка и применение batch
 
-Каждое socket message сначала проходит [`ServerRealtimeMessageSchema`](../src/client/src/realtime-client.ts#L112). Ветка `event.batch` и переход к recovery находятся в [строках 134–138](../src/client/src/realtime-client.ts#L134). Для batch [`RealtimeHotStore.applyBatch()`](../src/client/src/realtime-hot-store.ts#L132) проверяет:
+Каждое socket message сначала проходит [`ServerRealtimeMessageSchema`](../src/client/src/realtime-client.ts#L112). Ветка `event.batch` и переход к recovery находятся в [строках 134–138](../src/client/src/realtime-client.ts#L134). Для batch [`RealtimeHotStore.applyBatch()`](../src/client/src/realtime-hot-store.ts#L146) проверяет:
 
 1. `streamId` совпадает с локальным stream;
 2. batch не является полным duplicate;
@@ -144,9 +146,17 @@ Store также сохраняет:
 5. per-device `revision` новее текущего;
 6. объединённый telemetry object проходит `DeviceTelemetrySchema`.
 
-Telemetry patch мержится с текущим объектом, включая [field-level merge `values`](../src/client/src/realtime-hot-store.ts#L153). Stale device revision отбрасывается в [строке 152](../src/client/src/realtime-hot-store.ts#L152), но уже полученный contiguous stream cursor продвигается при [единственном publish batch](../src/client/src/realtime-hot-store.ts#L181). Один batch публикует одно store notification независимо от числа events.
+Telemetry patch мержится с текущим объектом, включая [field-level merge `values`](../src/client/src/realtime-hot-store.ts#L170). Stale device revision отбрасывается в [строке 166](../src/client/src/realtime-hot-store.ts#L166), но уже полученный contiguous stream cursor продвигается при [единственном publish batch](../src/client/src/realtime-hot-store.ts#L195). Один batch публикует одно store notification независимо от числа events.
 
-## 8. Recovery
+## 8. Alarm lifecycle consumption
+
+Snapshot indexing and `alarm.upsert` both replace a complete record in `alarmsById`. [`AlarmPanel`](../src/client/src/AlarmPanel.tsx) subscribes to this map and `statusByDeviceId`, а [`alarm-model.ts`](../src/client/src/alarm-model.ts) чисто выполняет severity/state filtering, operational sorting, counts и выбор strongest unresolved alarm per device. Для каждой строки `deviceId` связывает alarm со stable `DeviceMetadata` из building catalog; [`DeviceVisualMarkers`](../src/client/src/DeviceVisualMarkers.tsx) показывает type icon и protocol badge из metadata, а status square — из актуального hot-state index. Alarm severity/state визуально и семантически не заменяют telemetry status.
+
+При `Acknowledge` transport client получает schema-valid Alarm и вызывает [`RealtimeHotStore.upsertAlarm()`](../src/client/src/realtime-hot-store.ts). Это немедленно показывает accepted author/time, но сохраняет realtime `sequence`: только ordered `alarm.upsert` из socket двигает cursor. Если socket event пришёл раньше HTTP response, повторная запись того же полного record ничего не меняет.
+
+Renderer получает полный scoped список устройств отдельно от `filteredDevices`. [`alarm-layers.ts`](../src/client/src/alarm-layers.ts) создаёт один `ScatterplotLayer` unresolved contours; resolved records остаются в списке/карточке, но не на плане. `Locate` соединяет alarm `deviceId` с building catalog и атомарно обновляет Zustand floor/selection. Выбранная [`DeviceCard`](../src/client/src/DeviceCard.tsx) использует тот же marker strip, но status получает из своего точечного telemetry selector.
+
+## 9. Recovery
 
 Кратковременный disconnect вызывает [`scheduleReconnect()`](../src/client/src/realtime-client.ts#L158) с [exponential backoff 250–5 000 мс](../src/client/src/realtime-client.ts#L165), после чего client снова отправляет последний cursor. Доступные события приходят из replay.
 
@@ -171,7 +181,7 @@ resume(new streamId, new sequence)
 
 Resync также не записывает snapshot в TanStack Query.
 
-## 9. Selective React subscriptions
+## 10. Selective React subscriptions
 
 [`useRealtimeSelector`](../src/client/src/use-realtime-state.ts#L7) связывает внешний store с React через `useSyncExternalStore`:
 
@@ -186,28 +196,28 @@ Store уведомляет subscribers один раз на batch, но React р
 
 ### Operator toolbar
 
-[`OperatorToolbar`](../src/client/src/OperatorToolbar.tsx#L21) самостоятельно выбирает connection/cursor в [строках 27–28](../src/client/src/OperatorToolbar.tsx#L27) и выводит badge в [строках 107–111](../src/client/src/OperatorToolbar.tsx#L107):
+[`OperatorToolbar`](../src/client/src/OperatorToolbar.tsx#L22) самостоятельно выбирает connection/cursor/alarm map в [строках 28–31](../src/client/src/OperatorToolbar.tsx#L28) и выводит badge в [строке 116](../src/client/src/OperatorToolbar.tsx#L116):
 
 ```ts
 snapshot.connectionStatus
 snapshot.sequence
 ```
 
-Поэтому дешёвый live badge обновляется с каждым применённым batch, не заставляя тяжёлую сцену потреблять полную telemetry map.
+Connection/cursor badge обновляется с каждым применённым batch. Отдельный selector `alarmsById` обновляет active alarm counter только при alarm changes.
 
 ### Selected device card
 
-[`DeviceCard`](../src/client/src/DeviceCard.tsx#L18) вызывает selector в [строке 19](../src/client/src/DeviceCard.tsx#L19):
+[`DeviceCard`](../src/client/src/DeviceCard.tsx#L20) вызывает telemetry и alarm selectors в [строках 21–22](../src/client/src/DeviceCard.tsx#L21):
 
 ```ts
 useDeviceTelemetry(device.id)
 ```
 
-Selector возвращает только `telemetryByDeviceId.get(selectedId)`. Update другого устройства сохраняет identity выбранного telemetry object и не рендерит карточку.
+Telemetry selector возвращает только `telemetryByDeviceId.get(selectedId)`. Карточка отдельно фильтрует low-volume `alarmsById` для выбранного device; telemetry update другого устройства сохраняет identity выбранного telemetry object.
 
 ### Workspace и renderers
 
-[`useOperatorWorkspaceModel`](../src/client/src/use-operator-workspace.ts#L8) подписан только на renderer-relevant hot state в [строках 14–24](../src/client/src/use-operator-workspace.ts#L14):
+[`useOperatorWorkspaceModel`](../src/client/src/use-operator-workspace.ts#L8) подписан только на renderer-relevant hot state в [строках 13–24](../src/client/src/use-operator-workspace.ts#L13):
 
 - `statusByDeviceId`;
 - `dirtyStatusDeviceIds`;
@@ -215,24 +225,25 @@ Selector возвращает только `telemetryByDeviceId.get(selectedId)`
 - `priorityMembershipVersion`;
 - `priorityMembershipChanged`;
 - readiness/error.
+- `alarmsById` для alarm overlay.
 
 Полная `telemetryByDeviceId` больше не проходит через `OperatorWorkspace`, `FloorScene` или `BuildingOverview` props.
 
-## 10. Filters
+## 11. Filters
 
 Stable `DeviceMetadata[]` из catalog соединяется с `statusByDeviceId` по `deviceId` в чистой [`filterDevices()`](../src/client/src/operator-devices.ts#L21).
 
-Search/type/protocol filters не зависят от telemetry. Status version добавляется в memo dependencies только при активном status filter в [`use-operator-workspace.ts:31`](../src/client/src/use-operator-workspace.ts#L31):
+Search/type/protocol filters не зависят от telemetry. Zustand хранит три массива выбранных contract values. Status version добавляется в memo dependencies только когда выбраны не все statuses в [`use-operator-workspace.ts:37`](../src/client/src/use-operator-workspace.ts#L37):
 
 ```ts
-const statusFilterDependency = state.statusFilter === 'all'
+const statusFilterDependency = state.statusFilters.length === DeviceStatusSchema.options.length
   ? undefined
   : statusVersion;
 ```
 
-Value-only telemetry batch не пересчитывает filtered devices.
+Внутри type/protocol/status массива действует OR, между тремя массивами и search — AND. Master-checkbox управляет полным contract option set и показывает `indeterminate`, когда выбран неполный непустой subset. Value-only telemetry batch не пересчитывает filtered devices.
 
-## 11. FloorScene и BuildingOverview
+## 12. FloorScene и BuildingOverview
 
 [`OperatorWorkspace`](../src/client/src/OperatorWorkspace.tsx#L11) передаёт renderer-relevant props в [`FloorScene`](../src/client/src/OperatorWorkspace.tsx#L32) или [`BuildingOverview`](../src/client/src/OperatorWorkspace.tsx#L46):
 
@@ -242,11 +253,14 @@ status map
 dirty status IDs
 renderer versions
 selected stable device
+unfiltered scoped devices + alarms map for alarm contours
 ```
 
-[`FloorScene`](../src/client/src/FloorScene.tsx#L28) делегирует данные в [`useFloorSceneLayers`](../src/client/src/FloorScene.tsx#L46). [`BuildingOverview`](../src/client/src/BuildingOverview.tsx#L82) выполняет тот же pipeline после [добавления floor layout offsets](../src/client/src/BuildingOverview.tsx#L148). В обоих случаях карточка получает только stable `device`: floor card создаётся в [`FloorScene.tsx:94`](../src/client/src/FloorScene.tsx#L94), overview card — в [`BuildingOverview.tsx:356`](../src/client/src/BuildingOverview.tsx#L356), а live telemetry она выбирает самостоятельно.
+[`FloorScene`](../src/client/src/FloorScene.tsx) делегирует данные в `useFloorSceneLayers`. [`BuildingOverview`](../src/client/src/BuildingOverview.tsx) выполняет тот же pipeline после добавления floor layout offsets. В обоих случаях карточка получает stable `device`, а live telemetry/alarms выбирает самостоятельно.
 
-## 12. Device layers и dirty GPU updates
+Type glyph также следует stable metadata без промежуточного component mapping. [`device-visuals.ts`](../src/client/src/device-visuals.ts) берёт порядок непосредственно из `DeviceTypeSchema.options`, выделяет каждому из 19 типов уникальный SVG-atlas slot и отдаёт тот же key в deck.gl `getIcon`. [`DeviceVisualMarkers`](../src/client/src/DeviceVisualMarkers.tsx) вычисляет CSS background position по этому же порядку, поэтому filter row, alarm row, selected card и карта показывают один glyph для одного `device.type`.
+
+## 13. Device и alarm layers
 
 [`partitionDeviceItems()`](../src/client/src/device-layers.ts#L19) делит instances:
 
@@ -263,19 +277,27 @@ priority layer = warning · critical
 
 Value-only telemetry batch не меняет status map, dirty set и renderer versions, поэтому device layers сохраняют identity и не пересобираются.
 
+Alarm volume мал и обновляется существенно реже telemetry, поэтому alarm contour layer пересобирает только свой небольшой data array при смене `alarmsById`. Он не участвует в device dirty-range optimization и не создаёт DOM node на alarm/device.
+
 ## Основные файлы по ходу данных
 
 | Файл | Роль |
 |---|---|
-| [`operator-api.ts:14`](../src/client/src/operator-api.ts#L14) | raw catalog/bootstrap/resync HTTP и Zod parsing |
+| [`operator-api.ts`](../src/client/src/operator-api.ts) | raw catalog/bootstrap/resync/acknowledge HTTP и Zod parsing |
 | [`operator-queries.ts:6`](../src/client/src/operator-queries.ts#L6) | только stable catalog query/cache policy |
 | [`use-realtime-state.ts:7`](../src/client/src/use-realtime-state.ts#L7) | direct bootstrap lifecycle и React selectors |
 | [`realtime-client.ts:37`](../src/client/src/realtime-client.ts#L37) | WebSocket resume/reconnect/recovery |
-| [`realtime-hot-store.ts:64`](../src/client/src/realtime-hot-store.ts#L64) | authoritative indexed client state и batch application |
-| [`use-operator-workspace.ts:8`](../src/client/src/use-operator-workspace.ts#L8) | catalog scope, status filtering и renderer view model |
+| [`realtime-hot-store.ts:65`](../src/client/src/realtime-hot-store.ts#L65) | authoritative indexed client state и batch application |
+| [`use-operator-workspace.ts`](../src/client/src/use-operator-workspace.ts) | building catalog, local floor/status filtering и renderer view model |
 | [`OperatorWorkspace.tsx:11`](../src/client/src/OperatorWorkspace.tsx#L11) | распределение renderer-relevant props |
-| [`OperatorToolbar.tsx:21`](../src/client/src/OperatorToolbar.tsx#L21) | connection/cursor consumer |
-| [`DeviceCard.tsx:18`](../src/client/src/DeviceCard.tsx#L18) | selected-device telemetry consumer |
+| [`OperatorToolbar.tsx`](../src/client/src/OperatorToolbar.tsx) | connection/cursor и active alarm count consumer |
+| [`OperatorFilterRows.tsx`](../src/client/src/OperatorFilterRows.tsx) | checkbox multi-select UI и tri-state master controls |
+| [`AlarmPanel.tsx`](../src/client/src/AlarmPanel.tsx) | alarm filters, acknowledge и locate workflow |
+| [`alarm-model.ts`](../src/client/src/alarm-model.ts) | pure alarm selectors |
+| [`alarm-layers.ts`](../src/client/src/alarm-layers.ts) | plan contour layer factory |
+| [`SceneDeviceTooltip.tsx`](../src/client/src/SceneDeviceTooltip.tsx) | единственный hover-tooltip выбранного deck.gl instance |
+| [`selection-layers.ts`](../src/client/src/selection-layers.ts) | фиксированный selection halo двух renderer |
+| [`DeviceCard.tsx`](../src/client/src/DeviceCard.tsx) | selected-device telemetry/alarm consumer |
 | [`use-floor-scene-layers.ts:34`](../src/client/src/use-floor-scene-layers.ts#L34) | floor device grouping и dirty ranges |
 | [`BuildingOverview.tsx:82`](../src/client/src/BuildingOverview.tsx#L82) | building layout и тот же dirty-layer pipeline |
 | [`device-layers.ts:19`](../src/client/src/device-layers.ts#L19) | общий status partition и deck.gl `IconLayer` factory |
@@ -289,4 +311,7 @@ Value-only telemetry batch не меняет status map, dirty set и renderer v
 - Sequence gap никогда не угадывается и требует recovery.
 - Value-only update не пересобирает device layers.
 - Update одного устройства не рендерит карточку другого устройства.
+- HTTP acknowledgement не двигает realtime cursor; socket event двигает его ровно один раз.
+- Resolved alarm не рисуется на плане, но сохраняется в списке и audit view.
+- Device filters не скрывают unresolved alarm contour.
 - Geometry, metadata, hot state и UI state остаются раздельными.

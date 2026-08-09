@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { StateSnapshot } from '../../src/shared/api-contracts';
 import { EventBatchMessageSchema } from '../../src/shared/realtime-contracts';
 import { RealtimeHotStore } from '../../src/client/src/realtime-hot-store';
-import { makeTelemetry } from './device-fixtures';
+import { makeAlarm, makeTelemetry } from './device-fixtures';
 
 const timestamp = '2026-08-09T12:00:00.000Z';
 const initialSnapshot = (): StateSnapshot => ({
@@ -168,5 +168,44 @@ describe('RealtimeHotStore', () => {
     expect(after.dirtyStatusDeviceIds).toBe(before.dirtyStatusDeviceIds);
     expect(after.statusVersion).toBe(before.statusVersion);
     expect(after.priorityMembershipVersion).toBe(before.priorityMembershipVersion);
+  });
+
+  it('reconciles an HTTP alarm response without moving the realtime cursor', () => {
+    const store = new RealtimeHotStore();
+    const alarm = makeAlarm('alarm-1', 'device-1');
+    store.replaceSnapshot({ ...initialSnapshot(), alarms: [alarm] });
+    const listener = vi.fn();
+    store.subscribe(listener);
+    const acknowledged = makeAlarm('alarm-1', 'device-1', {
+      state: 'acknowledged',
+      acknowledgedAt: timestamp,
+      acknowledgedBy: 'operator-1',
+    });
+
+    store.upsertAlarm(acknowledged);
+
+    expect(store.getSnapshot().alarmsById.get('alarm-1')).toEqual(acknowledged);
+    expect(store.getSnapshot().sequence).toBe(10);
+    expect(listener).toHaveBeenCalledOnce();
+    store.upsertAlarm(acknowledged);
+    expect(listener).toHaveBeenCalledOnce();
+  });
+
+  it('applies a realtime alarm lifecycle event in the same contiguous stream', () => {
+    const store = new RealtimeHotStore();
+    store.replaceSnapshot(initialSnapshot());
+    const alarm = makeAlarm('alarm-1', 'device-1', { severity: 'critical' });
+    const alarmBatch = EventBatchMessageSchema.parse({
+      type: 'event.batch',
+      streamId: 'stream-1',
+      emittedAt: timestamp,
+      fromSequence: 11,
+      toSequence: 11,
+      events: [{ sequence: 11, event: { type: 'alarm.upsert', payload: alarm } }],
+    });
+
+    expect(store.applyBatch(alarmBatch)).toBe('applied');
+    expect(store.getSnapshot().alarmsById.get('alarm-1')).toEqual(alarm);
+    expect(store.getSnapshot().sequence).toBe(11);
   });
 });

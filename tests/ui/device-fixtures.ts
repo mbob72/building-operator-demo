@@ -1,4 +1,5 @@
 import type {
+  Alarm,
   DeviceMetadata,
   DeviceStatus,
   DeviceTelemetry,
@@ -42,4 +43,23 @@ export const makeTelemetry = (
   connection: status === 'offline' ? 'offline' : 'online',
   status,
   values: {},
+});
+
+export const makeAlarm = (
+  id: string,
+  deviceId: string,
+  overrides: Partial<Alarm> = {},
+): Alarm => ({
+  id,
+  deviceId,
+  severity: 'warning',
+  code: 'TEST_ALARM',
+  message: `Alarm ${id}`,
+  createdAt: '2026-08-09T12:00:00.000Z',
+  updatedAt: '2026-08-09T12:00:00.000Z',
+  state: 'active',
+  acknowledgedAt: null,
+  acknowledgedBy: null,
+  resolvedAt: null,
+  ...overrides,
 });

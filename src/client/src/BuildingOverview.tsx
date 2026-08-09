@@ -5,25 +5,32 @@ import type { DeckGLRef } from '@deck.gl/react';
 import { OrthographicView } from '@deck.gl/core';
 import { PathLayer, PolygonLayer, TextLayer } from '@deck.gl/layers';
 import type {
+  Alarm,
   DeviceMetadata,
   DeviceStatus,
 } from '../../shared/domain-contracts';
 import type { FloorSummary, SceneFeature } from '../../shared/scene-contracts';
+import { createAlarmIndicatorLayer } from './alarm-layers';
+import { selectVisibleAlarmByDevice } from './alarm-model';
 import { DeviceCard } from './DeviceCard';
+import { SceneDeviceTooltip, type HoveredDevice } from './SceneDeviceTooltip';
 import {
   createDeviceIconLayer,
   deviceDataRanges,
   partitionDeviceItems,
 } from './device-layers';
 import { SceneControls } from './SceneControls';
+import { createSelectionIndicatorLayer } from './selection-layers';
 import { featureColor, representativeZoom, zoomBandFor } from './scene-visuals';
 import { loadScene } from './scene-api';
-import { fitBounds, viewStateToBBox, type SceneViewState } from './viewport';
+import { fitBounds, type SceneViewState } from './viewport';
 import { useElementSize } from './use-element-size';
 
 interface BuildingOverviewProps {
   floors: FloorSummary[];
   devices: DeviceMetadata[];
+  alarmDevices: DeviceMetadata[];
+  alarmsById: ReadonlyMap<string, Alarm>;
   statusByDeviceId: ReadonlyMap<string, DeviceStatus>;
   dirtyStatusDeviceIds: ReadonlySet<string>;
   statusVersion: number;
@@ -82,6 +89,8 @@ const buildLayout = (floors: FloorSummary[], columns: number) => {
 export const BuildingOverview = ({
   floors,
   devices,
+  alarmDevices,
+  alarmsById,
   statusByDeviceId,
   dirtyStatusDeviceIds,
   statusVersion,
@@ -91,6 +100,7 @@ export const BuildingOverview = ({
   onSelectDevice,
 }: BuildingOverviewProps) => {
   const { ref, size } = useElementSize<HTMLDivElement>();
+  const [hoveredDevice, setHoveredDevice] = useState<HoveredDevice>();
   const columns = size.width > 0 && size.width < 720 ? 2 : 4;
   const layout = useMemo(() => buildLayout(floors, columns), [columns, floors]);
   const layoutByFloorId = useMemo(
@@ -149,6 +159,15 @@ export const BuildingOverview = ({
     const floorLayout = layoutByFloorId.get(device.floorId);
     return floorLayout ? [{ device, offset: floorLayout.offset }] : [];
   }), [devices, layoutByFloorId]);
+  const alarmByDeviceId = useMemo(
+    () => selectVisibleAlarmByDevice(alarmsById.values()),
+    [alarmsById],
+  );
+  const offsetAlarmDevices = useMemo(() => alarmDevices.flatMap((device): OffsetDevice[] => {
+    if (!alarmByDeviceId.has(device.id)) return [];
+    const floorLayout = layoutByFloorId.get(device.floorId);
+    return floorLayout ? [{ device, offset: floorLayout.offset }] : [];
+  }), [alarmByDeviceId, alarmDevices, layoutByFloorId]);
 
   const deviceGroups = useMemo(
     () => partitionDeviceItems(offsetDevices, (item) => item.device, statusByDeviceId),
@@ -175,23 +194,11 @@ export const BuildingOverview = ({
     [dirtyStatusDeviceIds, priorityLayerData, priorityMembershipChanged],
   );
 
-  const deviceLabels = useMemo(() => {
-    const result = new Map<string, OffsetDevice>();
-    if (selectedDevice) {
-      const layoutItem = layoutByFloorId.get(selectedDevice.floorId);
-      if (layoutItem) result.set(selectedDevice.id, { device: selectedDevice, offset: layoutItem.offset });
-    }
-    if (viewState.zoom >= 5.2 && size.width && size.height) {
-      const [minX, minY, maxX, maxY] = viewStateToBBox(viewState, size.width, size.height);
-      for (const item of offsetDevices) {
-        if (result.size >= 180) break;
-        const x = item.device.position.x + item.offset[0];
-        const y = item.device.position.y + item.offset[1];
-        if (x >= minX && x <= maxX && y >= minY && y <= maxY) result.set(item.device.id, item);
-      }
-    }
-    return [...result.values()];
-  }, [layoutByFloorId, offsetDevices, selectedDevice, size.height, size.width, viewState]);
+  const selectedOffsetDevice = useMemo(() => {
+    if (!selectedDevice) return undefined;
+    const layoutItem = layoutByFloorId.get(selectedDevice.floorId);
+    return layoutItem ? { device: selectedDevice, offset: layoutItem.offset } : undefined;
+  }, [layoutByFloorId, selectedDevice]);
 
   const layers = useMemo(() => {
     const position = (item: OffsetDevice): [number, number] => [
@@ -257,6 +264,11 @@ export const BuildingOverview = ({
         getTextAnchor: 'middle',
         getAlignmentBaseline: 'center',
       }),
+      createSelectionIndicatorLayer({
+        id: 'overview-selected-device',
+        data: selectedOffsetDevice ? [selectedOffsetDevice] : [],
+        getPosition: position,
+      }),
       createDeviceIconLayer({
         ...deviceLayerOptions,
         id: 'overview-devices',
@@ -269,31 +281,24 @@ export const BuildingOverview = ({
         data: priorityLayerData,
         dataDiff: priorityDataDiff,
       }),
-      new TextLayer<OffsetDevice>({
-        id: 'overview-device-labels',
-        data: deviceLabels,
+      createAlarmIndicatorLayer({
+        id: 'overview-alarm-indicators',
+        data: offsetAlarmDevices,
+        getDevice: (item) => item.device,
         getPosition: position,
-        getText: ({ device }) => device.name,
-        getColor: [228, 241, 240, 245],
-        getSize: 11,
-        getPixelOffset: [0, -13],
-        sizeUnits: 'pixels',
-        fontFamily: 'IBM Plex Mono, monospace',
-        getTextAnchor: 'middle',
-        getAlignmentBaseline: 'bottom',
-        background: true,
-        getBackgroundColor: [7, 19, 23, 220],
-        backgroundPadding: [3, 2],
+        alarmByDeviceId,
       }),
     ];
   }, [
-    deviceLabels,
+    alarmByDeviceId,
     layout.items,
     normalDataDiff,
     normalLayerData,
+    offsetAlarmDevices,
     priorityDataDiff,
     priorityLayerData,
     sceneData,
+    selectedOffsetDevice,
     selectedDevice?.id,
     statusByDeviceId,
     viewState.zoom,
@@ -314,6 +319,7 @@ export const BuildingOverview = ({
       className="scene"
       ref={ref}
       data-testid="building-overview"
+      onMouseLeave={() => setHoveredDevice(undefined)}
       onClick={(event) => {
         if (!(event.target instanceof HTMLCanvasElement)) return;
         const bounds = event.currentTarget.getBoundingClientRect();
@@ -345,13 +351,39 @@ export const BuildingOverview = ({
             maxZoom: 7,
           });
         }}
+        onHover={({ object, x, y }) => {
+          const item = object as OffsetDevice | undefined;
+          setHoveredDevice(item ? { device: item.device, x, y } : undefined);
+        }}
+      />
+      <SceneDeviceTooltip
+        hovered={hoveredDevice}
+        status={hoveredDevice
+          ? statusByDeviceId.get(hoveredDevice.device.id)
+          : undefined}
+        floorName={hoveredDevice
+          ? floors.find((floor) => floor.id === hoveredDevice.device.floorId)?.name
+            .replace('West Riverside Hospital · ', '')
+          : undefined}
+        size={size}
       />
       <SceneControls viewState={viewState} setViewState={setViewState} onFit={resetView} />
       <div className="scene__status" aria-live="polite">
         <span className={`status-dot ${queryError ? 'status-dot--error' : ''}`} />
-        {queryError instanceof Error
-          ? queryError.message
-          : `${band} · ${loadedScenes}/${floors.length} floors${emptyScenes ? ` · ${emptyScenes} empty` : ''} · ${devices.length} devices · ${deviceGroups.priority.length} priority · z ${viewState.zoom.toFixed(2)}${sceneQueries.some((query) => query.isFetching) ? ' · updating' : ''}`}
+        <span className="scene__status-content">
+          {queryError instanceof Error ? (
+            <span>{queryError.message}</span>
+          ) : (
+            <>
+              <span>
+                {band} · {loadedScenes}/{floors.length} floors{emptyScenes ? ` · ${emptyScenes} empty` : ''}
+              </span>
+              <span>
+                {devices.length} devices · {deviceGroups.priority.length} priority · z {viewState.zoom.toFixed(2)}{sceneQueries.some((query) => query.isFetching) ? ' · updating' : ''}
+              </span>
+            </>
+          )}
+        </span>
       </div>
       {selectedDevice && (
         <DeviceCard

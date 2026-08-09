@@ -1,5 +1,6 @@
 import { useEffect, useMemo } from 'react';
 import type { FloorSummary } from '../../shared/scene-contracts';
+import { DeviceStatusSchema } from '../../shared/domain-contracts';
 import { filterDevices } from './operator-devices';
 import { useDeviceCatalogQuery } from './operator-queries';
 import { useOperatorStore } from './operator-store';
@@ -8,8 +9,7 @@ import { useRealtimeBootstrap, useRealtimeSelector } from './use-realtime-state'
 export const useOperatorWorkspaceModel = (floors: FloorSummary[]) => {
   const state = useOperatorStore();
   const selectedFloor = floors.find((floor) => floor.id === state.selectedFloorId) ?? floors[0];
-  const floorIds = state.viewMode === 'floor' && selectedFloor ? [selectedFloor.id] : undefined;
-  const catalogQuery = useDeviceCatalogQuery(floorIds, Boolean(selectedFloor));
+  const catalogQuery = useDeviceCatalogQuery(undefined, Boolean(selectedFloor));
   useRealtimeBootstrap(Boolean(selectedFloor));
   const ready = useRealtimeSelector((snapshot) => snapshot.ready);
   const realtimeError = useRealtimeSelector((snapshot) => snapshot.error);
@@ -22,35 +22,44 @@ export const useOperatorWorkspaceModel = (floors: FloorSummary[]) => {
   const priorityMembershipChanged = useRealtimeSelector(
     (snapshot) => snapshot.priorityMembershipChanged,
   );
+  const alarmsById = useRealtimeSelector((snapshot) => snapshot.alarmsById);
 
   useEffect(() => {
     if (!state.selectedFloorId && floors[0]) state.setSelectedFloorId(floors[0].id);
   }, [floors, state.selectedFloorId, state.setSelectedFloorId]);
 
-  const devices = catalogQuery.data?.devices ?? [];
-  const statusFilterDependency = state.statusFilter === 'all' ? undefined : statusVersion;
+  const catalogDevices = catalogQuery.data?.devices ?? [];
+  const devices = useMemo(() => (
+    state.viewMode === 'floor' && selectedFloor
+      ? catalogDevices.filter((device) => device.floorId === selectedFloor.id)
+      : catalogDevices
+  ), [catalogDevices, selectedFloor, state.viewMode]);
+  const statusFilterDependency = state.statusFilters.length === DeviceStatusSchema.options.length
+    ? undefined
+    : statusVersion;
   const filteredDevices = useMemo(() => filterDevices(devices, statusByDeviceId, {
     search: state.search,
-    type: state.typeFilter,
-    protocol: state.protocolFilter,
-    status: state.statusFilter,
+    types: state.typeFilters,
+    protocols: state.protocolFilters,
+    statuses: state.statusFilters,
   }), [
     devices,
     state.search,
-    state.protocolFilter,
-    state.statusFilter,
-    state.typeFilter,
+    state.protocolFilters,
+    state.statusFilters,
+    state.typeFilters,
     statusFilterDependency,
   ]);
 
   const selectedDevice = useMemo(
-    () => devices.find((device) => device.id === state.selectedDeviceId),
-    [devices, state.selectedDeviceId],
+    () => catalogDevices.find((device) => device.id === state.selectedDeviceId),
+    [catalogDevices, state.selectedDeviceId],
   );
 
   return {
     viewMode: state.viewMode,
     selectedFloor,
+    catalogDevices,
     devices,
     filteredDevices,
     selectedDevice,
@@ -62,5 +71,6 @@ export const useOperatorWorkspaceModel = (floors: FloorSummary[]) => {
     statusVersion,
     priorityMembershipVersion,
     priorityMembershipChanged,
+    alarmsById,
   };
 };

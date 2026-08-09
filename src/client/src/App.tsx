@@ -21,13 +21,14 @@ export const App = () => {
     <main className="app-shell">
       <header className="topbar">
         <div>
-          <p className="eyebrow">OPERATOR SCENE / STAGE 5</p>
+          <p className="eyebrow">OPERATOR SCENE / STAGE 6</p>
           <h1>{title}</h1>
         </div>
         <div className="topbar__meta">
           <span>8 FLOORS</span>
           <span>18K DEVICES</span>
           <span>LIVE TELEMETRY</span>
+          <span>ALARM LIFECYCLE</span>
         </div>
       </header>
       <section className="workspace">

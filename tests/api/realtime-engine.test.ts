@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { EventBatchMessageSchema } from '../../src/shared/realtime-contracts';
+import { initialAlarms } from '../../src/server/initial-alarms';
 import { RealtimeEngine } from '../../src/server/realtime-engine';
 import { initialTelemetry } from '../../src/server/state-snapshot';
 
@@ -85,5 +86,65 @@ describe('RealtimeEngine', () => {
 
     expect(batch?.events).toHaveLength(1_000);
     expect(listener).toHaveBeenCalledOnce();
+  });
+
+  it('acknowledges an active alarm once and publishes the lifecycle transition', () => {
+    const engine = new RealtimeEngine({ streamId: 'stream-test', now });
+    const initial = initialAlarms.find((alarm) => alarm.state === 'active')!;
+    const listener = vi.fn();
+    engine.subscribe(listener);
+
+    const result = engine.acknowledgeAlarm(initial.id, {
+      acknowledgedBy: 'operator-1',
+      acknowledgedAt: now().toISOString(),
+    });
+
+    expect(result.status).toBe('acknowledged');
+    expect(result.alarm).toMatchObject({
+      state: 'acknowledged',
+      acknowledgedBy: 'operator-1',
+      acknowledgedAt: now().toISOString(),
+    });
+    expect(engine.latestSequence).toBe(1);
+    expect(listener.mock.calls[0]?.[0].events[0]?.event).toEqual({
+      type: 'alarm.upsert',
+      payload: result.alarm,
+    });
+
+    const repeated = engine.acknowledgeAlarm(initial.id, {
+      acknowledgedBy: 'operator-2',
+      acknowledgedAt: '2026-08-09T13:00:00.000Z',
+    });
+    expect(repeated.alarm).toEqual(result.alarm);
+    expect(engine.latestSequence).toBe(1);
+    expect(listener).toHaveBeenCalledOnce();
+  });
+
+  it('allows acknowledgement to resolve, but never reactivates a resolved alarm', () => {
+    const engine = new RealtimeEngine({ streamId: 'stream-test', now });
+    const initial = initialAlarms.find((alarm) => alarm.state === 'active')!;
+    const acknowledged = engine.acknowledgeAlarm(initial.id, {
+      acknowledgedBy: 'operator-1',
+      acknowledgedAt: now().toISOString(),
+    });
+    if (acknowledged.status !== 'acknowledged') throw new Error('expected alarm acknowledgement');
+
+    const resolvedAt = '2026-08-09T13:00:00.000Z';
+    const resolved = {
+      ...acknowledged.alarm,
+      state: 'resolved' as const,
+      updatedAt: resolvedAt,
+      resolvedAt,
+    };
+    expect(engine.publishAlarmUpserts([resolved])?.events).toHaveLength(1);
+    expect(engine.getAlarm(initial.id)?.state).toBe('resolved');
+
+    expect(engine.publishAlarmUpserts([{
+      ...resolved,
+      state: 'active',
+      updatedAt: '2026-08-09T14:00:00.000Z',
+      resolvedAt: null,
+    }])).toBeUndefined();
+    expect(engine.getAlarm(initial.id)?.state).toBe('resolved');
   });
 });

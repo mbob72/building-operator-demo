@@ -1,6 +1,9 @@
+import { useMemo } from 'react';
 import type { DeviceMetadata } from '../../shared/domain-contracts';
 import type { FloorSummary } from '../../shared/scene-contracts';
-import { useDeviceTelemetry } from './use-realtime-state';
+import { filterAndSortAlarms } from './alarm-model';
+import { DeviceMarkerStrip } from './DeviceVisualMarkers';
+import { useDeviceTelemetry, useRealtimeSelector } from './use-realtime-state';
 
 interface DeviceCardProps {
   device: DeviceMetadata;
@@ -17,8 +20,13 @@ const formatValue = (value: boolean | number | string | null): string => {
 
 export const DeviceCard = ({ device, floors, onClose }: DeviceCardProps) => {
   const telemetry = useDeviceTelemetry(device.id);
+  const alarmsById = useRealtimeSelector((snapshot) => snapshot.alarmsById);
   const floorName = floors.find((floor) => floor.id === device.floorId)?.name ?? device.floorId;
   const channels = Object.entries(telemetry?.values ?? {}).slice(0, 4);
+  const alarms = useMemo(() => filterAndSortAlarms(
+    [...alarmsById.values()].filter((alarm) => alarm.deviceId === device.id),
+    { severity: 'all', state: 'all' },
+  ), [alarmsById, device.id]);
 
   return (
     <aside className="device-card" aria-label="Selected device">
@@ -33,6 +41,7 @@ export const DeviceCard = ({ device, floors, onClose }: DeviceCardProps) => {
       <div className={`device-card__status device-card__status--${telemetry?.status ?? 'unknown'}`}>
         {telemetry?.status ?? 'unknown'} · {telemetry?.connection ?? 'unknown'}
       </div>
+      <DeviceMarkerStrip device={device} status={telemetry?.status ?? 'unknown'} />
       <dl>
         <div><dt>Floor</dt><dd>{floorName.replace('West Riverside Hospital · ', '')}</dd></div>
         <div><dt>Type</dt><dd>{device.type}</dd></div>
@@ -48,6 +57,18 @@ export const DeviceCard = ({ device, floors, onClose }: DeviceCardProps) => {
               <div key={key}><dt>{key}</dt><dd>{formatValue(value)}</dd></div>
             ))}
           </dl>
+        </div>
+      )}
+      {alarms.length > 0 && (
+        <div className="device-card__alarms">
+          <p>ALARMS</p>
+          {alarms.map((alarm) => (
+            <div key={alarm.id} className={`device-card__alarm device-card__alarm--${alarm.state}`}>
+              <strong>{alarm.severity} · {alarm.state}</strong>
+              <span>{alarm.message}</span>
+              {alarm.acknowledgedBy && <small>by {alarm.acknowledgedBy}</small>}
+            </div>
+          ))}
         </div>
       )}
       <p className="device-card__id">{device.id}</p>

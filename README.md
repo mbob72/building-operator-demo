@@ -1,6 +1,6 @@
 # Building operator MVP
 
-Stage 0 proves viewport-aware scene delivery for real West Riverside Hospital geometry. Stage 1 defines product and operational contracts. Stage 2 adds eight architectural floors, a representative 18,000-device catalog, and a 50,000-device stress fixture. Stage 3 renders a one-floor device slice. Stage 4 adds floor/building modes, filters and renderer LOD. Stage 5 adds an authoritative snapshot, ordered WebSocket telemetry, replay/resync, selective hot-state subscriptions and dirty GPU updates.
+Stage 0 proves viewport-aware scene delivery for real West Riverside Hospital geometry. Stage 1 defines product and operational contracts. Stage 2 adds eight architectural floors, a representative 18,000-device catalog, and a 50,000-device stress fixture. Stage 3 renders a one-floor device slice. Stage 4 adds floor/building modes, filters and renderer LOD. Stage 5 adds an authoritative snapshot, ordered WebSocket telemetry, replay/resync, selective hot-state subscriptions and dirty GPU updates. Stage 6 adds alarm lifecycle, acknowledge/locate workflow and a consistent device visual language with one unique atlas glyph for each of the 19 contract device types.
 
 ## Run
 
@@ -27,7 +27,7 @@ npm run contracts:generate
 npm run contracts:check
 ```
 
-See [`docs/product.md`](docs/product.md), [`docs/architecture.md`](docs/architecture.md), [`docs/architecture-todo.md`](docs/architecture-todo.md), [`docs/frontend-architecture.md`](docs/frontend-architecture.md), [`docs/frontend-data-consumption.md`](docs/frontend-data-consumption.md), [`docs/realtime-client-and-hot-store.md`](docs/realtime-client-and-hot-store.md), [`docs/backend-architecture.md`](docs/backend-architecture.md), [`reports/stage-one.md`](reports/stage-one.md), [`reports/data-quality.md`](reports/data-quality.md), [`reports/stage-three.md`](reports/stage-three.md), [`reports/stage-four.md`](reports/stage-four.md), and [`reports/stage-five.md`](reports/stage-five.md).
+See [`docs/product.md`](docs/product.md), [`docs/architecture.md`](docs/architecture.md), [`docs/architecture-todo.md`](docs/architecture-todo.md), [`docs/frontend-architecture.md`](docs/frontend-architecture.md), [`docs/frontend-data-consumption.md`](docs/frontend-data-consumption.md), [`docs/realtime-client-and-hot-store.md`](docs/realtime-client-and-hot-store.md), [`docs/backend-architecture.md`](docs/backend-architecture.md), [`reports/stage-one.md`](reports/stage-one.md), [`reports/data-quality.md`](reports/data-quality.md), [`reports/stage-three.md`](reports/stage-three.md), [`reports/stage-four.md`](reports/stage-four.md), [`reports/stage-five.md`](reports/stage-five.md), and [`reports/stage-six.md`](reports/stage-six.md).
 
 ## Production mode
 
@@ -42,7 +42,7 @@ Open <http://127.0.0.1:4174>. `npm run verify` includes a production smoke test 
 
 ## Live demo
 
-Open the public Stage 0 demo at <https://building-operator-demo.onrender.com>.
+Open the public building operator demo at <https://building-operator-demo.onrender.com>.
 
 The repository includes a Render Blueprint in `render.yaml` and GitHub Actions in `.github/workflows/ci.yml`. Render is configured to deploy the `main` branch only after CI checks pass. See [`docs/deployment.md`](docs/deployment.md).
 
