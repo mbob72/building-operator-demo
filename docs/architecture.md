@@ -20,22 +20,25 @@ flowchart LR
     subgraph Backend["Fastify backend"]
         SceneRepo["Scene repository"]
         CatalogRepo["Device catalog"]
-        Snapshot["Stage 4 status snapshot"]
+        RealtimeEngine["Realtime engine<br/>snapshot · sequence · replay"]
         FloorsAPI["GET /api/floors"]
         SceneAPI["POST /api/scene/query"]
         CatalogAPI["GET /api/v1/catalog"]
         SnapshotAPI["GET /api/v1/state/snapshot"]
+        RealtimeAPI["WS /api/v1/realtime"]
 
         SceneRepo --> FloorsAPI
         SceneRepo --> SceneAPI
         CatalogRepo --> CatalogAPI
-        CatalogRepo --> Snapshot
-        Snapshot --> SnapshotAPI
+        CatalogRepo --> RealtimeEngine
+        RealtimeEngine --> SnapshotAPI
+        RealtimeEngine --> RealtimeAPI
     end
 
     subgraph Frontend["React frontend"]
         Query["TanStack Query"]
         Store["Zustand UI state"]
+        Hot["Realtime hot store"]
         Workspace["OperatorWorkspace"]
         Renderers["FloorScene / BuildingOverview"]
         Deck["deck.gl layers"]
@@ -43,9 +46,10 @@ flowchart LR
 
         Query --> Workspace
         Store --> Workspace
+        Hot --> Workspace
         Workspace --> Renderers
         Renderers --> Deck
-        Workspace --> Card
+        Renderers --> Card
     end
 
     Scenes --> SceneRepo
@@ -53,6 +57,7 @@ flowchart LR
     FloorsAPI --> Query
     CatalogAPI --> Query
     SnapshotAPI --> Query
+    RealtimeAPI --> Hot
     SceneAPI --> Renderers
 ```
 
@@ -103,12 +108,11 @@ Successful catalog responses expose `catalogVersion` and should use an HTTP `ETa
 ## Snapshot and realtime lifecycle
 
 ```text
-connect WebSocket
-  -> subscribe(buildingId, optional floorIds)
-  <- hello(streamId, latestSequence, retentionStartSequence)
-  -> GET state/snapshot
+GET state/snapshot(buildingId)
   <- snapshot(streamId, sequence, full hot state)
+connect WebSocket
   -> resume(streamId, afterSequence = snapshot.sequence)
+  <- hello(streamId, latestSequence, retentionStartSequence)
   <- event.batch with contiguous sequences
 
 reconnect
@@ -148,10 +152,10 @@ transport: pending -> accepted -> executed
 - `npm run contracts:check` fails when committed generated schemas are stale.
 - ADR-0004 defines state separation; ADR-0005 defines realtime recovery.
 
-## Stage 4 implementation boundary
+## Stage 5 implementation boundary
 
-Stage 4 serves eight scenes, renders floor/building modes and exposes a deterministic read-only status snapshot. TanStack Query owns server documents; Zustand owns shared UI state. The snapshot is indexed for rendering without adding status to stable metadata.
+Stage 5 preserves the eight scene/catalog flows and replaces the read-only status fixture with an authoritative in-memory engine, building-scoped ordered WebSocket stream, bounded replay and HTTP resync. TanStack Query owns stable/cacheable server documents; direct HTTP bootstrap/resync feeds the external hot store without a second query-cache copy. Zustand owns shared UI state; the hot store owns indexed operational state and cursor.
 
-Stage 4 intentionally does not implement WebSocket transport or the indexed external hot store shown in the target architecture. Those belong to Stage 5. The static snapshot uses the final contract shape so the data source can change without rewriting scene/catalog boundaries.
+Selective subscriptions isolate update domains: toolbar observes connection/cursor, `DeviceCard` observes one telemetry record, and renderers observe status versions/dirty IDs. Value-only telemetry does not rebuild device layers. Status-only changes use deck.gl dirty ranges unless they change normal/priority layer membership.
 
-Post-acceptance geometry hardening adds one generated convex-hull `floor-shell` per prepared floor. It is visible across the complete supported zoom range `[-8, 24]` and its bbox covers every other feature bbox. Successful empty scene responses expose `meta.emptyReason`, distinguishing a viewport outside floor bounds, an in-floor viewport without spatial candidates, and candidates removed by LOD.
+Stage 4 post-acceptance geometry hardening adds one generated convex-hull `floor-shell` per prepared floor. It is visible across the complete supported zoom range `[-8, 24]` and its bbox covers every other feature bbox. Successful empty scene responses expose `meta.emptyReason`, distinguishing a viewport outside floor bounds, an in-floor viewport without spatial candidates, and candidates removed by LOD.

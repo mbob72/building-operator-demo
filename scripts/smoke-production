@@ -65,9 +65,37 @@ curl --fail --silent \
 
 node -e '
   const response = JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"));
-  if (response.snapshotId !== "stage-4-static-snapshot-v1:west-riverside-level-7") process.exit(1);
+  if (!response.snapshotId.startsWith("stage-5-live-snapshot-v1:")) process.exit(1);
+  if (!response.streamId.startsWith("stage-5-")) process.exit(1);
+  if (!Number.isSafeInteger(response.sequence) || response.sequence < 0) process.exit(1);
   if (response.telemetry.length !== 150) process.exit(1);
   if (!response.telemetry.some((item) => item.status === "warning" || item.status === "critical")) process.exit(1);
 ' "$snapshot_response"
+
+node -e '
+  const fs = require("node:fs");
+  const snapshot = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+  const socket = new WebSocket(`ws://127.0.0.1:${process.argv[2]}/api/v1/realtime`);
+  const timeout = setTimeout(() => {
+    console.error("Timed out waiting for production realtime batch");
+    process.exit(1);
+  }, 5000);
+  socket.addEventListener("open", () => socket.send(JSON.stringify({
+    type: "resume",
+    protocolVersion: "1",
+    buildingId: "west-riverside",
+    streamId: snapshot.streamId,
+    afterSequence: snapshot.sequence,
+  })));
+  socket.addEventListener("message", (event) => {
+    const message = JSON.parse(String(event.data));
+    if (message.type !== "event.batch") return;
+    if (message.streamId !== snapshot.streamId) process.exit(1);
+    if (message.fromSequence !== snapshot.sequence + 1) process.exit(1);
+    if (message.toSequence < message.fromSequence) process.exit(1);
+    clearTimeout(timeout);
+    socket.close();
+  });
+' "$snapshot_response" "$task_port"
 
 echo "Production smoke test passed"

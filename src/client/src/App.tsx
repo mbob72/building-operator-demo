@@ -21,13 +21,13 @@ export const App = () => {
     <main className="app-shell">
       <header className="topbar">
         <div>
-          <p className="eyebrow">OPERATOR SCENE / STAGE 4</p>
+          <p className="eyebrow">OPERATOR SCENE / STAGE 5</p>
           <h1>{title}</h1>
         </div>
         <div className="topbar__meta">
           <span>8 FLOORS</span>
           <span>18K DEVICES</span>
-          <span>STATUS LOD</span>
+          <span>LIVE TELEMETRY</span>
         </div>
       </header>
       <section className="workspace">
@@ -43,7 +43,7 @@ export const App = () => {
       </section>
       <footer className="footer">
         <span>Drag to pan · wheel or controls to zoom · click a device for details</span>
-        <span>Geometry · stable catalog · status snapshot are independent data flows</span>
+        <span>Geometry · stable catalog · realtime hot state are independent data flows</span>
       </footer>
     </main>
   );

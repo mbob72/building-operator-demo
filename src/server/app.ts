@@ -1,18 +1,22 @@
 import Fastify from 'fastify';
 import fastifyCompress from '@fastify/compress';
 import fastifyStatic from '@fastify/static';
+import fastifyWebsocket from '@fastify/websocket';
 import { createHash } from 'node:crypto';
 import { resolve } from 'node:path';
 import { CatalogQuerySchema, StateSnapshotQuerySchema } from '../shared/api-contracts.js';
 import { SceneQuerySchema } from '../shared/scene-contracts.js';
 import { deviceCatalog, selectCatalogFloors } from './device-catalog.js';
 import { findScene, floors, sceneDatasetVersion } from './scene-repository.js';
+import { RealtimeEngine } from './realtime-engine.js';
+import { registerRealtimeRoute } from './realtime-route.js';
 import { selectSceneFeatures } from './scene-selection.js';
-import { selectSnapshotFloors } from './state-snapshot.js';
 
 interface AppOptions {
   serveStatic?: boolean;
   staticRoot?: string;
+  realtimeEngine?: RealtimeEngine;
+  startRealtimeSimulator?: boolean;
 }
 
 const zoomBand = (zoom: number) => {
@@ -23,7 +27,17 @@ const zoomBand = (zoom: number) => {
 
 export const buildApp = (options: AppOptions = {}) => {
   const app = Fastify({ logger: false });
+  const realtimeEngine = options.realtimeEngine ?? new RealtimeEngine();
+  app.register(fastifyWebsocket, { options: { maxPayload: 1_048_576 } });
   app.register(fastifyCompress, { global: true, threshold: 1_024 });
+  app.register(async (realtimeRoutes) => {
+    registerRealtimeRoute(realtimeRoutes, realtimeEngine);
+  });
+
+  if (options.startRealtimeSimulator) {
+    app.addHook('onReady', () => realtimeEngine.startSimulator());
+  }
+  app.addHook('onClose', () => realtimeEngine.stopSimulator());
 
   app.get('/api/health', async () => ({ status: 'ok' }));
 
@@ -77,13 +91,14 @@ export const buildApp = (options: AppOptions = {}) => {
     if (floorIds.some((floorId) => !floors.some((item) => item.id === floorId))) {
       return reply.status(404).send({ error: 'floor_not_found' });
     }
+    const snapshot = realtimeEngine.snapshot(floorIds);
     const etag = `"${createHash('sha256')
-      .update(`stage-4-static-snapshot-v1:${floorIds.join(',')}`)
+      .update(`${snapshot.streamId}:${snapshot.sequence}:${floorIds.join(',')}`)
       .digest('base64url')}"`;
     reply.header('etag', etag);
-    reply.header('cache-control', 'public, max-age=300, stale-while-revalidate=60');
+    reply.header('cache-control', 'no-store');
     if (request.headers['if-none-match'] === etag) return reply.status(304).send();
-    return selectSnapshotFloors(floorIds);
+    return snapshot;
   });
 
   app.post('/api/scene/query', async (request, reply) => {

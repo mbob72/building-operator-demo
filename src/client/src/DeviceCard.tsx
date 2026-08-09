@@ -1,9 +1,9 @@
-import type { DeviceMetadata, DeviceTelemetry } from '../../shared/domain-contracts';
+import type { DeviceMetadata } from '../../shared/domain-contracts';
 import type { FloorSummary } from '../../shared/scene-contracts';
+import { useDeviceTelemetry } from './use-realtime-state';
 
 interface DeviceCardProps {
   device: DeviceMetadata;
-  telemetry: DeviceTelemetry | undefined;
   floors: FloorSummary[];
   onClose: () => void;
 }
@@ -15,7 +15,8 @@ const formatValue = (value: boolean | number | string | null): string => {
   return value;
 };
 
-export const DeviceCard = ({ device, telemetry, floors, onClose }: DeviceCardProps) => {
+export const DeviceCard = ({ device, floors, onClose }: DeviceCardProps) => {
+  const telemetry = useDeviceTelemetry(device.id);
   const floorName = floors.find((floor) => floor.id === device.floorId)?.name ?? device.floorId;
   const channels = Object.entries(telemetry?.values ?? {}).slice(0, 4);
 
@@ -41,7 +42,7 @@ export const DeviceCard = ({ device, telemetry, floors, onClose }: DeviceCardPro
       </dl>
       {channels.length > 0 && (
         <div className="device-card__telemetry">
-          <p>SNAPSHOT VALUES</p>
+          <p>LIVE VALUES</p>
           <dl>
             {channels.map(([key, value]) => (
               <div key={key}><dt>{key}</dt><dd>{formatValue(value)}</dd></div>

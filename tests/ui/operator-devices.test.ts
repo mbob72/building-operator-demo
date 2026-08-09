@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { filterDevices } from '../../src/client/src/operator-devices';
-import { makeDevice, makeTelemetry } from './device-fixtures';
+import { makeDevice } from './device-fixtures';
 
 const noFilters = {
   search: '',
@@ -27,20 +27,20 @@ describe('operator device filtering', () => {
       protocol: 'modbus',
     }),
   ];
-  const telemetry = new Map([
-    ['AHU-L1-01', makeTelemetry('AHU-L1-01', 'warning')],
-    ['LIGHT-L1-01', makeTelemetry('LIGHT-L1-01', 'normal')],
+  const statuses = new Map([
+    ['AHU-L1-01', 'warning' as const],
+    ['LIGHT-L1-01', 'normal' as const],
   ]);
 
   it('matches a trimmed case-insensitive name or ID search', () => {
-    expect(filterDevices(devices, telemetry, { ...noFilters, search: '  AIR handler ' }))
+    expect(filterDevices(devices, statuses, { ...noFilters, search: '  AIR handler ' }))
       .toEqual([devices[0]]);
-    expect(filterDevices(devices, telemetry, { ...noFilters, search: 'light-l1' }))
+    expect(filterDevices(devices, statuses, { ...noFilters, search: 'light-l1' }))
       .toEqual([devices[1]]);
   });
 
   it('combines type, protocol and telemetry status filters', () => {
-    expect(filterDevices(devices, telemetry, {
+    expect(filterDevices(devices, statuses, {
       search: 'north',
       type: 'hvac-unit',
       protocol: 'bacnet',
@@ -49,8 +49,8 @@ describe('operator device filtering', () => {
   });
 
   it('does not match a status filter when telemetry is missing', () => {
-    expect(filterDevices(devices, telemetry, { ...noFilters, status: 'unknown' }))
+    expect(filterDevices(devices, statuses, { ...noFilters, status: 'unknown' }))
       .toEqual([]);
-    expect(filterDevices(devices, telemetry, noFilters)).toEqual(devices);
+    expect(filterDevices(devices, statuses, noFilters)).toEqual(devices);
   });
 });

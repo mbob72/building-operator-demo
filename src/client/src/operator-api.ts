@@ -34,3 +34,12 @@ export const loadStateSnapshot = async (
   if (!response.ok) throw new Error(`State snapshot request failed: ${response.status}`);
   return StateSnapshotSchema.parse(await response.json());
 };
+
+export const loadStateSnapshotPath = async (
+  path: string,
+  signal?: AbortSignal,
+): Promise<StateSnapshot> => {
+  const response = await fetch(path, signal ? { signal } : undefined);
+  if (!response.ok) throw new Error(`State resync request failed: ${response.status}`);
+  return StateSnapshotSchema.parse(await response.json());
+};

@@ -1,7 +1,13 @@
 import { expect, test } from '@playwright/test';
 
-test('switches floors, filters devices, opens building overview, and keeps GPU picking', async ({ page }) => {
+test('streams live state while switching floors, filtering, overviewing, and GPU picking', async ({ page }) => {
   await page.goto('/');
+  const realtimeStatus = page.getByTestId('realtime-status');
+  await expect(realtimeStatus).toHaveText(/live · #\d+/);
+  const initialSequence = Number((await realtimeStatus.textContent())?.match(/#(\d+)/)?.[1]);
+  await expect.poll(async () => (
+    Number((await realtimeStatus.textContent())?.match(/#(\d+)/)?.[1])
+  )).toBeGreaterThan(initialSequence);
   await expect(page.getByRole('heading', { name: /West Riverside Hospital · Level 1/ })).toBeVisible();
   await expect(page.getByTestId('floor-scene')).toBeVisible();
   await expect(page.getByText(/features · 2900 devices · \d+ priority · z/)).toBeVisible();
@@ -49,7 +55,7 @@ test('switches floors, filters devices, opens building overview, and keeps GPU p
   }
   await expect(deviceCard).toBeVisible();
   await expect(deviceCard.getByText(/normal|warning|critical|offline/)).toBeVisible();
-  await expect(deviceCard.getByText('SNAPSHOT VALUES')).toBeVisible();
+  await expect(deviceCard.getByText('LIVE VALUES')).toBeVisible();
   await page.getByRole('button', { name: 'Close device card' }).click();
   await expect(deviceCard).toHaveCount(0);
 });

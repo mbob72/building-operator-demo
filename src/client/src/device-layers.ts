@@ -2,7 +2,6 @@ import { IconLayer } from '@deck.gl/layers';
 import type {
   DeviceMetadata,
   DeviceStatus,
-  DeviceTelemetry,
 } from '../../shared/domain-contracts';
 import {
   colorForDevice,
@@ -13,23 +12,43 @@ import {
 } from './device-visuals';
 
 export const statusForDevice = (
-  telemetryByDeviceId: ReadonlyMap<string, DeviceTelemetry>,
+  statusByDeviceId: ReadonlyMap<string, DeviceStatus>,
   deviceId: string,
-): DeviceStatus => telemetryByDeviceId.get(deviceId)?.status ?? 'unknown';
+): DeviceStatus => statusByDeviceId.get(deviceId) ?? 'unknown';
 
 export const partitionDeviceItems = <T>(
   items: readonly T[],
   getDevice: (item: T) => DeviceMetadata,
-  telemetryByDeviceId: ReadonlyMap<string, DeviceTelemetry>,
+  statusByDeviceId: ReadonlyMap<string, DeviceStatus>,
 ) => {
   const normal: T[] = [];
   const priority: T[] = [];
   for (const item of items) {
     const device = getDevice(item);
-    if (isPriorityStatus(statusForDevice(telemetryByDeviceId, device.id))) priority.push(item);
+    if (isPriorityStatus(statusForDevice(statusByDeviceId, device.id))) priority.push(item);
     else normal.push(item);
   }
   return { normal, priority };
+};
+
+export interface DeviceDataRange {
+  startRow: number;
+  endRow: number;
+}
+
+export const deviceDataRanges = <T>(
+  data: readonly T[],
+  getDevice: (item: T) => DeviceMetadata,
+  dirtyDeviceIds: ReadonlySet<string>,
+): DeviceDataRange[] => {
+  const ranges: DeviceDataRange[] = [];
+  for (let index = 0; index < data.length; index += 1) {
+    if (!dirtyDeviceIds.has(getDevice(data[index]!).id)) continue;
+    const previous = ranges.at(-1);
+    if (previous?.endRow === index) previous.endRow = index + 1;
+    else ranges.push({ startRow: index, endRow: index + 1 });
+  }
+  return ranges;
 };
 
 interface DeviceIconLayerOptions<T> {
@@ -37,10 +56,11 @@ interface DeviceIconLayerOptions<T> {
   data: T[];
   getDevice: (item: T) => DeviceMetadata;
   getPosition: (item: T) => [number, number];
-  telemetryByDeviceId: ReadonlyMap<string, DeviceTelemetry>;
+  statusByDeviceId: ReadonlyMap<string, DeviceStatus>;
   selectedDeviceId: string | undefined;
   zoom: number;
   sizeMinPixels: number;
+  dataDiff: DeviceDataRange[] | undefined;
 }
 
 export const createDeviceIconLayer = <T>({
@@ -48,10 +68,11 @@ export const createDeviceIconLayer = <T>({
   data,
   getDevice,
   getPosition,
-  telemetryByDeviceId,
+  statusByDeviceId,
   selectedDeviceId,
   zoom,
   sizeMinPixels,
+  dataDiff,
 }: DeviceIconLayerOptions<T>) => new IconLayer<T>({
   id,
   data,
@@ -63,13 +84,13 @@ export const createDeviceIconLayer = <T>({
     const device = getDevice(item);
     return colorForDevice(
       device,
-      statusForDevice(telemetryByDeviceId, device.id),
+      statusForDevice(statusByDeviceId, device.id),
       device.id === selectedDeviceId,
     );
   },
   getSize: (item) => {
     const device = getDevice(item);
-    return deviceSizeForZoom(zoom, statusForDevice(telemetryByDeviceId, device.id));
+    return deviceSizeForZoom(zoom, statusForDevice(statusByDeviceId, device.id));
   },
   sizeUnits: 'pixels',
   sizeMinPixels,
@@ -77,8 +98,9 @@ export const createDeviceIconLayer = <T>({
   pickable: true,
   autoHighlight: true,
   highlightColor: [255, 255, 255, 90],
+  ...(dataDiff ? { _dataDiff: () => dataDiff } : {}),
   updateTriggers: {
-    getColor: [selectedDeviceId, telemetryByDeviceId],
-    getSize: [zoom, telemetryByDeviceId],
+    getColor: [selectedDeviceId],
+    getSize: [zoom],
   },
 });

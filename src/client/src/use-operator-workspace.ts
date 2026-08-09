@@ -1,27 +1,35 @@
 import { useEffect, useMemo } from 'react';
-import type { DeviceTelemetry } from '../../shared/domain-contracts';
 import type { FloorSummary } from '../../shared/scene-contracts';
 import { filterDevices } from './operator-devices';
-import { useDeviceCatalogQuery, useStateSnapshotQuery } from './operator-queries';
+import { useDeviceCatalogQuery } from './operator-queries';
 import { useOperatorStore } from './operator-store';
+import { useRealtimeBootstrap, useRealtimeSelector } from './use-realtime-state';
 
 export const useOperatorWorkspaceModel = (floors: FloorSummary[]) => {
   const state = useOperatorStore();
   const selectedFloor = floors.find((floor) => floor.id === state.selectedFloorId) ?? floors[0];
   const floorIds = state.viewMode === 'floor' && selectedFloor ? [selectedFloor.id] : undefined;
   const catalogQuery = useDeviceCatalogQuery(floorIds, Boolean(selectedFloor));
-  const snapshotQuery = useStateSnapshotQuery(floorIds, Boolean(selectedFloor));
+  useRealtimeBootstrap(Boolean(selectedFloor));
+  const ready = useRealtimeSelector((snapshot) => snapshot.ready);
+  const realtimeError = useRealtimeSelector((snapshot) => snapshot.error);
+  const statusByDeviceId = useRealtimeSelector((snapshot) => snapshot.statusByDeviceId);
+  const dirtyStatusDeviceIds = useRealtimeSelector((snapshot) => snapshot.dirtyStatusDeviceIds);
+  const statusVersion = useRealtimeSelector((snapshot) => snapshot.statusVersion);
+  const priorityMembershipVersion = useRealtimeSelector(
+    (snapshot) => snapshot.priorityMembershipVersion,
+  );
+  const priorityMembershipChanged = useRealtimeSelector(
+    (snapshot) => snapshot.priorityMembershipChanged,
+  );
 
   useEffect(() => {
     if (!state.selectedFloorId && floors[0]) state.setSelectedFloorId(floors[0].id);
   }, [floors, state.selectedFloorId, state.setSelectedFloorId]);
 
-  const telemetryByDeviceId = useMemo(() => new Map<string, DeviceTelemetry>(
-    snapshotQuery.data?.telemetry.map((telemetry) => [telemetry.deviceId, telemetry]) ?? [],
-  ), [snapshotQuery.data]);
-
   const devices = catalogQuery.data?.devices ?? [];
-  const filteredDevices = useMemo(() => filterDevices(devices, telemetryByDeviceId, {
+  const statusFilterDependency = state.statusFilter === 'all' ? undefined : statusVersion;
+  const filteredDevices = useMemo(() => filterDevices(devices, statusByDeviceId, {
     search: state.search,
     type: state.typeFilter,
     protocol: state.protocolFilter,
@@ -32,7 +40,7 @@ export const useOperatorWorkspaceModel = (floors: FloorSummary[]) => {
     state.protocolFilter,
     state.statusFilter,
     state.typeFilter,
-    telemetryByDeviceId,
+    statusFilterDependency,
   ]);
 
   const selectedDevice = useMemo(
@@ -45,10 +53,14 @@ export const useOperatorWorkspaceModel = (floors: FloorSummary[]) => {
     selectedFloor,
     devices,
     filteredDevices,
-    telemetryByDeviceId,
     selectedDevice,
     onSelectDevice: state.setSelectedDeviceId,
-    requestError: catalogQuery.error ?? snapshotQuery.error,
-    isLoading: catalogQuery.isLoading || snapshotQuery.isLoading,
+    requestError: catalogQuery.error ?? realtimeError,
+    isLoading: catalogQuery.isLoading || !ready,
+    statusByDeviceId,
+    dirtyStatusDeviceIds,
+    statusVersion,
+    priorityMembershipVersion,
+    priorityMembershipChanged,
   };
 };

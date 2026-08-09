@@ -69,3 +69,7 @@ IFC-origin devices retain source file, IFC class, numeric entity ID, and GlobalI
 ## A-015 Simplified base floor geometry
 
 The convex hull of all prepared architectural feature coordinates is an intentionally simplified base footprint, not an exact room, façade, or navigable-area boundary. It exists to preserve floor context across the supported LOD range and is replaceable by a higher-fidelity footprint without changing the scene API, provided one full-range `floor-shell` continues to cover every prepared feature bbox.
+
+## A-016 Building-scoped realtime cursor
+
+Stage 5 uses one monotonically increasing stream and replay cursor for the whole building. The frontend therefore bootstraps the complete building hot snapshot even while the stable catalog is floor-scoped. The server sends complete building batches rather than removing events for unselected floors, because filtering a globally sequenced batch would create false gaps. A future per-floor sharding design must introduce independent stream IDs/cursors instead of reusing this global sequence.

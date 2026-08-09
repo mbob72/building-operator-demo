@@ -5,10 +5,9 @@ import {
   type DeviceTelemetry,
   type TelemetryScalar,
 } from '../shared/domain-contracts.js';
-import { StateSnapshotSchema, type StateSnapshot } from '../shared/api-contracts.js';
 import { deviceCatalog } from './device-catalog.js';
 
-const SNAPSHOT_TIME = '2026-08-08T00:00:00.000Z';
+export const INITIAL_SNAPSHOT_TIME = '2026-08-08T00:00:00.000Z';
 
 const stableHash = (value: string): number => {
   let hash = 2_166_136_261;
@@ -53,42 +52,15 @@ const telemetryFor = (device: DeviceMetadata): DeviceTelemetry => {
   return DeviceTelemetrySchema.parse({
     deviceId: device.id,
     revision: 1,
-    observedAt: SNAPSHOT_TIME,
-    receivedAt: SNAPSHOT_TIME,
+    observedAt: INITIAL_SNAPSHOT_TIME,
+    receivedAt: INITIAL_SNAPSHOT_TIME,
     connection: status === 'offline' ? 'offline' : 'online',
     status,
     values,
   });
 };
 
-const deviceFloor = new Map(deviceCatalog.devices.map((device) => [device.id, device.floorId]));
-const fullSnapshot = StateSnapshotSchema.parse({
-  snapshotId: 'stage-4-static-snapshot-v1',
-  buildingId: deviceCatalog.building.id,
-  streamId: 'stage-4-static-stream-v1',
-  sequence: 0,
-  generatedAt: SNAPSHOT_TIME,
-  telemetry: deviceCatalog.devices.map(telemetryFor),
-  alarms: [],
-  commands: [],
-});
-
-export const selectSnapshotFloors = (floorIds: string[]): StateSnapshot => {
-  const selectedFloorIds = new Set(floorIds);
-  const isBuildingScope = selectedFloorIds.size === deviceCatalog.floors.length
-    && deviceCatalog.floors.every((floor) => selectedFloorIds.has(floor.id));
-  const scopeId = isBuildingScope
-    ? 'building'
-    : floorIds.length === 1
-      ? floorIds[0] ?? 'empty'
-      : floorIds.map((floorId) => floorId.replace('west-riverside-', '')).join(',');
-  const telemetry = fullSnapshot.telemetry.filter((item) => {
-    const floorId = deviceFloor.get(item.deviceId);
-    return floorId !== undefined && selectedFloorIds.has(floorId);
-  });
-  return {
-    ...fullSnapshot,
-    snapshotId: `${fullSnapshot.snapshotId}:${scopeId}`,
-    telemetry,
-  };
-};
+export const deviceFloorById = new Map(
+  deviceCatalog.devices.map((device) => [device.id, device.floorId]),
+);
+export const initialTelemetry = deviceCatalog.devices.map(telemetryFor);

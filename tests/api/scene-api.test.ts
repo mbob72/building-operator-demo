@@ -227,7 +227,9 @@ describe('status snapshot API', () => {
     expect(response.headers.etag).toMatch(/^".+"$/);
 
     const repeated = StateSnapshotSchema.parse((await app.inject({ method: 'GET', url })).json());
-    expect(repeated).toEqual(snapshot);
+    expect(repeated.streamId).toBe(snapshot.streamId);
+    expect(repeated.sequence).toBe(snapshot.sequence);
+    expect(repeated.telemetry).toEqual(snapshot.telemetry);
 
     const cached = await app.inject({
       method: 'GET',

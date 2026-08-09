@@ -6,11 +6,15 @@ import { OrthographicView } from '@deck.gl/core';
 import { PathLayer, PolygonLayer, TextLayer } from '@deck.gl/layers';
 import type {
   DeviceMetadata,
-  DeviceTelemetry,
+  DeviceStatus,
 } from '../../shared/domain-contracts';
 import type { FloorSummary, SceneFeature } from '../../shared/scene-contracts';
 import { DeviceCard } from './DeviceCard';
-import { createDeviceIconLayer, partitionDeviceItems } from './device-layers';
+import {
+  createDeviceIconLayer,
+  deviceDataRanges,
+  partitionDeviceItems,
+} from './device-layers';
 import { SceneControls } from './SceneControls';
 import { featureColor, representativeZoom, zoomBandFor } from './scene-visuals';
 import { loadScene } from './scene-api';
@@ -20,7 +24,11 @@ import { useElementSize } from './use-element-size';
 interface BuildingOverviewProps {
   floors: FloorSummary[];
   devices: DeviceMetadata[];
-  telemetryByDeviceId: ReadonlyMap<string, DeviceTelemetry>;
+  statusByDeviceId: ReadonlyMap<string, DeviceStatus>;
+  dirtyStatusDeviceIds: ReadonlySet<string>;
+  statusVersion: number;
+  priorityMembershipVersion: number;
+  priorityMembershipChanged: boolean;
   selectedDevice: DeviceMetadata | undefined;
   onSelectDevice: (deviceId?: string) => void;
 }
@@ -74,7 +82,11 @@ const buildLayout = (floors: FloorSummary[], columns: number) => {
 export const BuildingOverview = ({
   floors,
   devices,
-  telemetryByDeviceId,
+  statusByDeviceId,
+  dirtyStatusDeviceIds,
+  statusVersion,
+  priorityMembershipVersion,
+  priorityMembershipChanged,
   selectedDevice,
   onSelectDevice,
 }: BuildingOverviewProps) => {
@@ -139,8 +151,28 @@ export const BuildingOverview = ({
   }), [devices, layoutByFloorId]);
 
   const deviceGroups = useMemo(
-    () => partitionDeviceItems(offsetDevices, (item) => item.device, telemetryByDeviceId),
-    [offsetDevices, telemetryByDeviceId],
+    () => partitionDeviceItems(offsetDevices, (item) => item.device, statusByDeviceId),
+    [offsetDevices, priorityMembershipVersion],
+  );
+  const normalLayerData = useMemo(
+    () => [...deviceGroups.normal],
+    [deviceGroups.normal, statusVersion],
+  );
+  const priorityLayerData = useMemo(
+    () => [...deviceGroups.priority],
+    [deviceGroups.priority, statusVersion],
+  );
+  const normalDataDiff = useMemo(
+    () => priorityMembershipChanged
+      ? undefined
+      : deviceDataRanges(normalLayerData, (item) => item.device, dirtyStatusDeviceIds),
+    [dirtyStatusDeviceIds, normalLayerData, priorityMembershipChanged],
+  );
+  const priorityDataDiff = useMemo(
+    () => priorityMembershipChanged
+      ? undefined
+      : deviceDataRanges(priorityLayerData, (item) => item.device, dirtyStatusDeviceIds),
+    [dirtyStatusDeviceIds, priorityLayerData, priorityMembershipChanged],
   );
 
   const deviceLabels = useMemo(() => {
@@ -169,7 +201,7 @@ export const BuildingOverview = ({
     const deviceLayerOptions = {
       getDevice: (item: OffsetDevice) => item.device,
       getPosition: position,
-      telemetryByDeviceId,
+      statusByDeviceId,
       selectedDeviceId: selectedDevice?.id,
       zoom: viewState.zoom,
       sizeMinPixels: 4,
@@ -228,12 +260,14 @@ export const BuildingOverview = ({
       createDeviceIconLayer({
         ...deviceLayerOptions,
         id: 'overview-devices',
-        data: deviceGroups.normal,
+        data: normalLayerData,
+        dataDiff: normalDataDiff,
       }),
       createDeviceIconLayer({
         ...deviceLayerOptions,
         id: 'overview-priority-devices',
-        data: deviceGroups.priority,
+        data: priorityLayerData,
+        dataDiff: priorityDataDiff,
       }),
       new TextLayer<OffsetDevice>({
         id: 'overview-device-labels',
@@ -252,7 +286,18 @@ export const BuildingOverview = ({
         backgroundPadding: [3, 2],
       }),
     ];
-  }, [deviceGroups, deviceLabels, layout.items, sceneData, selectedDevice?.id, telemetryByDeviceId, viewState.zoom]);
+  }, [
+    deviceLabels,
+    layout.items,
+    normalDataDiff,
+    normalLayerData,
+    priorityDataDiff,
+    priorityLayerData,
+    sceneData,
+    selectedDevice?.id,
+    statusByDeviceId,
+    viewState.zoom,
+  ]);
 
   const resetView = () => {
     if (size.width && size.height) {
@@ -311,7 +356,6 @@ export const BuildingOverview = ({
       {selectedDevice && (
         <DeviceCard
           device={selectedDevice}
-          telemetry={telemetryByDeviceId.get(selectedDevice.id)}
           floors={floors}
           onClose={() => onSelectDevice(undefined)}
         />

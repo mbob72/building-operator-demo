@@ -34,7 +34,11 @@ export const OperatorWorkspace = ({ floors }: OperatorWorkspaceProps) => {
             floor={model.selectedFloor}
             floors={floors}
             devices={model.filteredDevices}
-            telemetryByDeviceId={model.telemetryByDeviceId}
+            statusByDeviceId={model.statusByDeviceId}
+            dirtyStatusDeviceIds={model.dirtyStatusDeviceIds}
+            statusVersion={model.statusVersion}
+            priorityMembershipVersion={model.priorityMembershipVersion}
+            priorityMembershipChanged={model.priorityMembershipChanged}
             selectedDevice={model.selectedDevice}
             onSelectDevice={model.onSelectDevice}
           />
@@ -43,7 +47,11 @@ export const OperatorWorkspace = ({ floors }: OperatorWorkspaceProps) => {
           <BuildingOverview
             floors={floors}
             devices={model.filteredDevices}
-            telemetryByDeviceId={model.telemetryByDeviceId}
+            statusByDeviceId={model.statusByDeviceId}
+            dirtyStatusDeviceIds={model.dirtyStatusDeviceIds}
+            statusVersion={model.statusVersion}
+            priorityMembershipVersion={model.priorityMembershipVersion}
+            priorityMembershipChanged={model.priorityMembershipChanged}
             selectedDevice={model.selectedDevice}
             onSelectDevice={model.onSelectDevice}
           />

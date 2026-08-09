@@ -1,4 +1,4 @@
-import type { DeviceMetadata, DeviceTelemetry } from '../../shared/domain-contracts';
+import type { DeviceMetadata, DeviceStatus } from '../../shared/domain-contracts';
 import type {
   DeviceProtocolFilter,
   DeviceStatusFilter,
@@ -20,15 +20,14 @@ const matchesSearch = (device: DeviceMetadata, normalizedSearch: string) => (
 
 export const filterDevices = (
   devices: readonly DeviceMetadata[],
-  telemetryByDeviceId: ReadonlyMap<string, DeviceTelemetry>,
+  statusByDeviceId: ReadonlyMap<string, DeviceStatus>,
   filters: DeviceFilters,
 ) => {
   const normalizedSearch = filters.search.trim().toLocaleLowerCase();
   return devices.filter((device) => {
-    const telemetry = telemetryByDeviceId.get(device.id);
     return matchesSearch(device, normalizedSearch)
       && (filters.type === 'all' || device.type === filters.type)
       && (filters.protocol === 'all' || device.protocol === filters.protocol)
-      && (filters.status === 'all' || telemetry?.status === filters.status);
+      && (filters.status === 'all' || statusByDeviceId.get(device.id) === filters.status);
   });
 };

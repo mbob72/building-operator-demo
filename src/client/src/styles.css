@@ -114,6 +114,19 @@ h1 { margin: 0; font-size: clamp(20px, 2vw, 28px); font-weight: 500; letter-spac
 .mode-switch button.is-active,
 .operator-toolbar__reset:hover { color: #071014; background: #73d7ce; }
 .operator-toolbar__reset { flex: 0 0 auto; }
+.operator-toolbar__realtime {
+  flex: 0 0 auto;
+  min-width: 92px;
+  padding-bottom: 9px;
+  color: #6f9091;
+  font: 500 9px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  text-align: right;
+  text-transform: uppercase;
+}
+.operator-toolbar__realtime--live { color: #63d0a1; }
+.operator-toolbar__realtime--reconnecting,
+.operator-toolbar__realtime--resyncing { color: #f2bd54; }
+.operator-toolbar__realtime--error { color: #ff7770; }
 .operator-toolbar__count {
   flex: 0 0 auto;
   min-width: 76px;

@@ -1,9 +1,10 @@
 import { useMemo } from 'react';
 import { PathLayer, PolygonLayer, TextLayer } from '@deck.gl/layers';
-import type { DeviceMetadata, DeviceTelemetry } from '../../shared/domain-contracts';
+import type { DeviceMetadata, DeviceStatus } from '../../shared/domain-contracts';
 import type { SceneFeature, SceneResponse } from '../../shared/scene-contracts';
 import {
   createDeviceIconLayer,
+  deviceDataRanges,
   partitionDeviceItems,
 } from './device-layers';
 import { FLOOR_DEVICE_LAYER_IDS } from './floor-scene-config';
@@ -22,7 +23,11 @@ interface UseFloorSceneLayersOptions {
   viewState: SceneViewState;
   scene: SceneResponse | undefined;
   devices: DeviceMetadata[];
-  telemetryByDeviceId: ReadonlyMap<string, DeviceTelemetry>;
+  statusByDeviceId: ReadonlyMap<string, DeviceStatus>;
+  dirtyStatusDeviceIds: ReadonlySet<string>;
+  statusVersion: number;
+  priorityMembershipVersion: number;
+  priorityMembershipChanged: boolean;
   selectedDevice: DeviceMetadata | undefined;
 }
 
@@ -32,12 +37,37 @@ export const useFloorSceneLayers = ({
   viewState,
   scene,
   devices,
-  telemetryByDeviceId,
+  statusByDeviceId,
+  dirtyStatusDeviceIds,
+  statusVersion,
+  priorityMembershipVersion,
+  priorityMembershipChanged,
   selectedDevice,
 }: UseFloorSceneLayersOptions) => {
   const deviceGroups = useMemo(
-    () => partitionDeviceItems(devices, (device) => device, telemetryByDeviceId),
-    [devices, telemetryByDeviceId],
+    () => partitionDeviceItems(devices, (device) => device, statusByDeviceId),
+    [devices, priorityMembershipVersion],
+  );
+
+  const normalLayerData = useMemo(
+    () => [...deviceGroups.normal],
+    [deviceGroups.normal, statusVersion],
+  );
+  const priorityLayerData = useMemo(
+    () => [...deviceGroups.priority],
+    [deviceGroups.priority, statusVersion],
+  );
+  const normalDataDiff = useMemo(
+    () => priorityMembershipChanged
+      ? undefined
+      : deviceDataRanges(normalLayerData, (device) => device, dirtyStatusDeviceIds),
+    [dirtyStatusDeviceIds, normalLayerData, priorityMembershipChanged],
+  );
+  const priorityDataDiff = useMemo(
+    () => priorityMembershipChanged
+      ? undefined
+      : deviceDataRanges(priorityLayerData, (device) => device, dirtyStatusDeviceIds),
+    [dirtyStatusDeviceIds, priorityLayerData, priorityMembershipChanged],
   );
 
   const deviceLabels = useMemo(() => selectFloorDeviceLabels({
@@ -66,7 +96,7 @@ export const useFloorSceneLayers = ({
     const deviceLayerOptions = {
       getDevice: (device: DeviceMetadata) => device,
       getPosition,
-      telemetryByDeviceId,
+      statusByDeviceId,
       selectedDeviceId: selectedDevice?.id,
       zoom: viewState.zoom,
       sizeMinPixels: 5,
@@ -108,12 +138,14 @@ export const useFloorSceneLayers = ({
       createDeviceIconLayer({
         ...deviceLayerOptions,
         id: FLOOR_DEVICE_LAYER_IDS[0],
-        data: deviceGroups.normal,
+        data: normalLayerData,
+        dataDiff: normalDataDiff,
       }),
       createDeviceIconLayer({
         ...deviceLayerOptions,
         id: FLOOR_DEVICE_LAYER_IDS[1],
-        data: deviceGroups.priority,
+        data: priorityLayerData,
+        dataDiff: priorityDataDiff,
       }),
       new TextLayer<DeviceMetadata>({
         id: 'device-labels',
@@ -132,7 +164,17 @@ export const useFloorSceneLayers = ({
         backgroundPadding: [3, 2],
       }),
     ];
-  }, [deviceGroups, deviceLabels, scene, selectedDevice?.id, telemetryByDeviceId, viewState.zoom]);
+  }, [
+    deviceLabels,
+    normalDataDiff,
+    normalLayerData,
+    priorityDataDiff,
+    priorityLayerData,
+    scene,
+    selectedDevice?.id,
+    statusByDeviceId,
+    viewState.zoom,
+  ]);
 
   return { layers, priorityDeviceCount: deviceGroups.priority.length };
 };

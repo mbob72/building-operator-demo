@@ -10,6 +10,7 @@ import {
   type DeviceStatusFilter,
   type DeviceTypeFilter,
 } from './operator-store';
+import { useRealtimeSelector } from './use-realtime-state';
 
 interface OperatorToolbarProps {
   floors: FloorSummary[];
@@ -17,8 +18,14 @@ interface OperatorToolbarProps {
   totalDevices: number;
 }
 
-export const OperatorToolbar = ({ floors, visibleDevices, totalDevices }: OperatorToolbarProps) => {
+export const OperatorToolbar = ({
+  floors,
+  visibleDevices,
+  totalDevices,
+}: OperatorToolbarProps) => {
   const state = useOperatorStore();
+  const connectionStatus = useRealtimeSelector((snapshot) => snapshot.connectionStatus);
+  const realtimeSequence = useRealtimeSelector((snapshot) => snapshot.sequence);
 
   return (
     <div className="operator-toolbar" aria-label="Scene controls">
@@ -97,6 +104,11 @@ export const OperatorToolbar = ({ floors, visibleDevices, totalDevices }: Operat
       </label>
 
       <button type="button" className="operator-toolbar__reset" onClick={state.resetFilters}>Reset</button>
+      <output
+        className={`operator-toolbar__realtime operator-toolbar__realtime--${connectionStatus}`}
+        data-testid="realtime-status"
+        title={`Applied realtime sequence ${realtimeSequence}`}
+      >{connectionStatus} · #{realtimeSequence}</output>
       <output className="operator-toolbar__count">{visibleDevices.toLocaleString()} / {totalDevices.toLocaleString()}</output>
     </div>
   );

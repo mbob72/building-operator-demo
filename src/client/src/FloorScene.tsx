@@ -2,7 +2,7 @@ import DeckGL from '@deck.gl/react';
 import { OrthographicView } from '@deck.gl/core';
 import type {
   DeviceMetadata,
-  DeviceTelemetry,
+  DeviceStatus,
 } from '../../shared/domain-contracts';
 import type { FloorSummary } from '../../shared/scene-contracts';
 import { DeviceCard } from './DeviceCard';
@@ -16,7 +16,11 @@ interface FloorSceneProps {
   floor: FloorSummary;
   floors: FloorSummary[];
   devices: DeviceMetadata[];
-  telemetryByDeviceId: ReadonlyMap<string, DeviceTelemetry>;
+  statusByDeviceId: ReadonlyMap<string, DeviceStatus>;
+  dirtyStatusDeviceIds: ReadonlySet<string>;
+  statusVersion: number;
+  priorityMembershipVersion: number;
+  priorityMembershipChanged: boolean;
   selectedDevice: DeviceMetadata | undefined;
   onSelectDevice: (deviceId?: string) => void;
 }
@@ -25,7 +29,11 @@ export const FloorScene = ({
   floor,
   floors,
   devices,
-  telemetryByDeviceId,
+  statusByDeviceId,
+  dirtyStatusDeviceIds,
+  statusVersion,
+  priorityMembershipVersion,
+  priorityMembershipChanged,
   selectedDevice,
   onSelectDevice,
 }: FloorSceneProps) => {
@@ -41,7 +49,11 @@ export const FloorScene = ({
     viewState: controller.viewState,
     scene: controller.scene,
     devices,
-    telemetryByDeviceId,
+    statusByDeviceId,
+    dirtyStatusDeviceIds,
+    statusVersion,
+    priorityMembershipVersion,
+    priorityMembershipChanged,
     selectedDevice,
   });
   const emptySceneMessage = sceneEmptyMessage(controller.scene);
@@ -82,7 +94,6 @@ export const FloorScene = ({
       {selectedDevice && selectedDevice.floorId === floor.id && (
         <DeviceCard
           device={selectedDevice}
-          telemetry={telemetryByDeviceId.get(selectedDevice.id)}
           floors={floors}
           onClose={() => onSelectDevice(undefined)}
         />
