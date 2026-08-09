@@ -3,7 +3,7 @@
 Подробный пошаговый путь данных от HTTP/WebSocket до компонентов и deck.gl описан в [`frontend-data-consumption.md`](frontend-data-consumption.md). Взаимодействие `RealtimeClient` и `RealtimeHotStore` разобрано отдельно в [`realtime-client-and-hot-store.md`](realtime-client-and-hot-store.md).
 
 - Актуально на: 2026-08-09
-- Текущий этап: Stage 5 реализован, ожидает приёмки
+- Текущий этап: Stage 5, принят 2026-08-09
 - Назначение: живое описание реализованного frontend; обновляется при каждом этапе и существенном изменении data flow.
 
 ## Пользовательский результат
