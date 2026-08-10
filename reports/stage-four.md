@@ -1,4 +1,4 @@
-# Stage 4 report — floor mode and building overview
+# Отчёт этапа 4 — floor mode и building overview
 
 Дата: 2026-08-08  
 Статус: принят пользователем 2026-08-09
@@ -28,7 +28,7 @@
 - Добавлены чистые unit-границы для device partition, filters и label LOD, а также hook-тест debounce/abort lifecycle floor scene.
 - После приёмки закрыт `ARCH-001`: dataset `stage-2-v2` содержит full-range base shell на каждом этаже, API возвращает explicit empty reason, frontend показывает диагностический empty-state.
 
-## Статический status dataset
+## Статический набор статусов
 
 Stage 4 использует утверждённый read-only snapshot, отдельный от metadata:
 

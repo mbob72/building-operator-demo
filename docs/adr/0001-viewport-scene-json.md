@@ -1,21 +1,22 @@
-# ADR-0001: Viewport-aware JSON scene query
+# ADR-0001: Viewport-aware JSON-запрос сцены
 
-- Status: accepted for Stage 0
-- Date: 2026-08-07
+- Статус: принят для этапа 0
+- Дата: 2026-08-07
 
-## Context
+## Контекст
 
-The operator UI must navigate large 2D floor scenes. Before choosing a production tiling scheme, the client/server responsibility boundary needs to be exercised.
+Операторский UI должен перемещаться по большим 2D-сценам этажей. До выбора production tiling
+необходимо проверить границу ответственности client/server.
 
-## Decision
+## Решение
 
-Use `POST /api/scene/query` with a floor ID, world-coordinate bbox, pixel dimensions, and continuous zoom. Return a JSON feature collection already filtered by viewport and feature zoom range.
+Использовать `POST /api/scene/query` с ID этажа, bbox в мировых координатах, пиксельными размерами
+и непрерывным zoom. Возвращать JSON feature collection, уже отфильтрованную по viewport и zoom range.
+На client использовать ортографическую deck.gl-сцену; представление features не связывать с React.
 
-Use a deck.gl orthographic view on the client. Keep feature representation independent of React components.
+## Последствия
 
-## Consequences
-
-- The API behavior is straightforward to inspect and test.
-- The same contract is backed by an offline IFC pipeline and can later be backed by indexed scene chunks.
-- Linear scanning and JSON encoding are not assumed to be production-ready.
-- Real-geometry measurements may lead to vector tiles or indexed scene chunks in a later ADR.
+- Поведение API легко проверять и тестировать.
+- Контракт работает с offline IFC pipeline и позже может опираться на indexed scene chunks.
+- Linear scan и JSON encoding не считаются автоматически production-ready.
+- Измерения реальной геометрии могут обосновать vector tiles или индексы в отдельном ADR.

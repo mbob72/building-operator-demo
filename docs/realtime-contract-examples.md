@@ -24,7 +24,7 @@
 
 ## Базовые типы
 
-### Sequence
+### Порядковый номер (`sequence`)
 
 ```json
 1042
@@ -32,13 +32,13 @@
 
 Допустимо целое неотрицательное число до `Number.MAX_SAFE_INTEGER`. Значение используется и для global realtime sequence, и для telemetry revision, но смысл определяется полем, в котором оно находится.
 
-### Timestamp
+### Временная метка (`timestamp`)
 
 ```json
 "2026-08-10T10:00:00.120Z"
 ```
 
-### EntityId
+### Идентификатор сущности (`EntityId`)
 
 ```json
 "west-riverside-temperature-sensor-17"
@@ -133,7 +133,7 @@ values = { temperature: 23.4, setpoint: 22, occupied: true }
 
 Контракт: [`AlarmSchema`](../src/shared/domain-contracts.ts#L231).
 
-Active alarm:
+Активная авария:
 
 ```json
 {
@@ -175,7 +175,7 @@ Active alarm:
 
 Контракт: [`CommandRecordSchema`](../src/shared/domain-contracts.ts#L295).
 
-Pending command:
+Команда в состоянии `pending`:
 
 ```json
 {
@@ -304,7 +304,7 @@ Executed state той же команды:
 
 Здесь `sequence = 1040` означает: snapshot уже включает эффект всех событий этого stream до номера 1040 включительно. После установки snapshot клиент запрашивает события `1041+`.
 
-## Client message: subscribe
+## Сообщение client: `subscribe`
 
 Контракт: [`SubscribeMessageSchema`](../src/shared/realtime-contracts.ts#L37).
 
@@ -332,7 +332,7 @@ Executed state той же команды:
 
 Штатный frontend сначала получает snapshot и поэтому отправляет `resume`, а не `subscribe`. Особенность текущей fallback-ветки описана в [карте реализации](realtime-implementation-guide.md#известные-ограничения-и-риски).
 
-## Client message: resume
+## Сообщение client: `resume`
 
 Контракт: [`ResumeMessageSchema`](../src/shared/realtime-contracts.ts#L44).
 
@@ -348,7 +348,7 @@ Executed state той же команды:
 
 Смысл: «Отдай все события stream `stage-8-9-stream-2026-08-10` после sequence 1040 и затем подключи меня к live updates».
 
-## Server message: hello
+## Сообщение server: `hello`
 
 Контракт: [`HelloMessageSchema`](../src/shared/realtime-contracts.ts#L58).
 
@@ -456,7 +456,7 @@ Executed state той же команды:
 }
 ```
 
-Batch constraints:
+Ограничения batch:
 
 - `events` содержит от 1 до 5000 элементов;
 - первый event имеет `sequence = fromSequence`;
@@ -466,7 +466,7 @@ Batch constraints:
 
 Текущий backend обычно создаёт отдельные telemetry, alarm или command batches. Смешанный batch валиден по контракту и показывает, что client store обязан корректно применять разные типы в одном ordered диапазоне.
 
-## Server message: resync.required
+## Сообщение server: `resync.required`
 
 Контракт: [`ResyncRequiredMessageSchema`](../src/shared/realtime-contracts.ts#L91).
 
@@ -488,7 +488,7 @@ Batch constraints:
 | `streamChanged` | Client resume относится к другому `streamId` |
 | `serverRestart` | Client sequence находится впереди текущего server sequence |
 
-## Server message: heartbeat
+## Сообщение server: `heartbeat`
 
 Контракт: [`HeartbeatMessageSchema`](../src/shared/realtime-contracts.ts#L99).
 
@@ -517,7 +517,7 @@ Store отбрасывает events `1041` и `1042`, проверяет, что
 
 ## Примеры невалидных данных
 
-### Gap внутри batch
+### Разрыв sequence внутри batch
 
 ```json
 {
@@ -532,7 +532,7 @@ Store отбрасывает events `1041` и `1042`, проверяет, что
 
 Не пройдёт `EventBatchMessageSchema`: отсутствует `sequence = 11`. Объект сокращён и также не содержит обязательные поля, но последовательность сама по себе уже невалидна.
 
-### Empty telemetry patch
+### Пустой telemetry patch
 
 ```json
 {

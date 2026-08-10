@@ -1,8 +1,8 @@
-# Building Operator MVP — Release Notes
+# Building Operator MVP — журнал этапов
 
 ## Текущий статус
 
-- Текущий статус: **объединённый этап 8–9 завершён и принят; этап 10 не начат**.
+- Текущий статус: **объединённые этапы 10–11 завершены и приняты; MVP завершён**.
 - Этапы 0–7 завершены и приняты.
 - Разработка ведётся последовательно одним coding agent.
 - Переход между этапами выполняется только после явного апрува пользователя.
@@ -66,7 +66,11 @@
 - Coalescing повторных событий и пакетное обновление dirty GPU-атрибутов.
 - Отсутствие React-render на каждое realtime-сообщение.
 
-Реализованы authoritative mutable snapshot, building-scoped WebSocket stream, contiguous sequence, replay window, heartbeat, reconnect/resume и HTTP resync. Hot state индексирован отдельно от TanStack Query и Zustand; selector subscriptions изолируют toolbar, выбранную карточку и renderer status. Value-only batches не пересобирают device layers, а status changes используют dirty deck.gl ranges либо полную перегруппировку только при смене priority membership. Отчёт: `reports/stage-five.md`.
+Реализованы authoritative mutable snapshot, building-scoped WebSocket stream, contiguous sequence,
+replay window, heartbeat, reconnect/resume и HTTP resync. Hot state индексирован отдельно от TanStack
+Query и Zustand; selector subscriptions изолируют toolbar, выбранную карточку и renderer status.
+Value-only batches не пересобирают device layer, а status changes используют dirty deck.gl ranges
+стабильного массива. Отчёт: `reports/stage-five.md`.
 
 ### Этап 6. Аварии — завершён и принят
 
@@ -115,7 +119,7 @@ Chromium acceptance разрывает только WebSocket, выполняе�
 terminal state из polling, восстанавливает ordered stream и получает actual telemetry convergence.
 Полный отчёт: `reports/stage-eight-nine.md`.
 
-### Этап 10. Performance benchmark и оптимизация
+### Этап 10–11. Performance, оптимизация и финализация MVP — завершён и принят
 
 - Репрезентативный dataset порядка десятков тысяч устройств.
 - Отдельный stress fixture на 50 000 устройств.
@@ -124,13 +128,22 @@ terminal state из polling, восстанавливает ordered stream и п
 - Измерение frame-time percentiles, long tasks, памяти, React commits и telemetry latency.
 - Проверка на целевом desktop и репрезентативном мобильном браузере.
 - Spatial index, clustering, workers и дополнительный culling добавляются только по результатам измерений.
-
-### Этап 11. Финализация MVP
-
 - Полный прогон acceptance criteria.
 - Воспроизводимый performance report.
 - README с запуском, архитектурой, источниками, лицензией и ограничениями.
 - Итоговый отчёт и список известных рисков.
+
+Этап 11 включён в этап 10: результаты benchmark являются внутренним gate перед финализацией,
+а итоговая приёмка охватывает performance evidence, полный продукт и документацию. Stage 10–11
+также переводит человекочитаемую Markdown-документацию репозитория на русский; contract names,
+API paths, code blocks и технические identifiers сохраняются без смыслового переименования.
+
+Добавлены dedicated representative/stress benchmarks, instrumentation React/realtime и test-only
+burst route. Измерения обосновали один стабильный основной `IconLayer`, GPU status filtering и
+dirty-range updates; spatial index/clustering/workers не потребовались. Матрица
+18 000/50 000 × desktop/mobile прошла вместе с `verify` и Chromium E2E. Документация переведена на
+русский с сохранением технических identifiers. Отчёты: `reports/performance.md` и
+`reports/stage-ten-eleven.md`.
 
 ---
 
@@ -142,7 +155,7 @@ terminal state из polling, восстанавливает ordered stream и п
 
 ### Реализовано
 
-#### Backend
+#### Серверная часть
 
 - Node.js + TypeScript + Fastify.
 - `GET /api/health` — проверка состояния API.
@@ -181,7 +194,7 @@ terminal state из polling, восстанавливает ordered stream и п
 
 Источник: West Riverside Hospital, IFC-Bench/OpenIFC Model Repository. Лицензия исходной модели: CC BY 3.0.
 
-#### Offline pipeline
+#### Offline-конвейер
 
 - Добавлен воспроизводимый download script с проверкой checksum.
 - Добавлен Python extractor на IfcOpenShell и Shapely.
@@ -191,7 +204,7 @@ terminal state из polling, восстанавливает ordered stream и п
 npm run data:floor
 ```
 
-#### Frontend
+#### Клиентская часть
 
 - React + TypeScript + Vite.
 - deck.gl с `OrthographicView`.
@@ -215,7 +228,7 @@ npm run dev:web -- --host 0.0.0.0
 
 После запуска frontend открывается по адресу `http://<LAN-IP-мака>:5173`.
 
-#### Rendering guardrails
+#### Ограничения рендеринга
 
 До начала device-этапа зафиксированы правила:
 

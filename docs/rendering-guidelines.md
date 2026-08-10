@@ -1,101 +1,85 @@
-# Rendering guidelines for large object counts
+# Рекомендации по рендерингу большого числа объектов
 
-Source reviewed: [shared ChatGPT discussion](https://chatgpt.com/share/6a760c62-6c9c-83eb-a93e-714ecebd57e0), 2026-08-07.
+Проверенный источник: [обсуждение ChatGPT](https://chatgpt.com/share/6a760c62-6c9c-83eb-a93e-714ecebd57e0),
+2026-08-07. Это guardrails проекта, а не требование применить каждую оптимизацию. Любое усложнение
+должно устранять измеренное узкое место на репрезентативных данных и целевом оборудовании.
 
-These are project guardrails, not assumptions that every optimization is needed. Each optimization must address a measured bottleneck on representative data and target hardware.
+## Базовая модель
 
-## Core model
+- React владеет shell приложения: navigation, filters, panels, selection, alarms и commands.
+- deck.gl владеет графической сценой; устройство не становится React/DOM node.
+- План, устройства, labels, selection, zones и relationships — отдельные render layers.
+- Static entity metadata отделена от hot telemetry.
+- Renderer получает подготовленную scene data и domain state, но не raw IFC/protocol payloads.
 
-- React owns the application shell: navigation, filters, panels, selected entity, alarms, and commands.
-- deck.gl owns the graphical scene. A device must not become a React or DOM node.
-- The floor plan, devices, labels, selection, zones, and relationships are separate render layers.
-- Static entity metadata and hot telemetry are separate data structures.
-- The renderer consumes prepared scene data and domain-level device state, never raw IFC or protocol-specific payloads.
+## Устройства
 
-## Device rendering
+- Использовать один instanced deck.gl `IconLayer` для основной population.
+- Один texture atlas содержит уникальный slot каждого контрактного `DeviceType`.
+- deck.gl `iconMapping` и React marker backgrounds выводятся из одного ordered type list.
+- Минимизировать layers/draw calls; разделять их только при действительно разном поведении/cadence.
+- Использовать GPU picking, без per-device handlers и JSX.
+- Не пересоздавать полный device array из-за одного telemetry change.
+- Сохранять порядок и обновлять только dirty color/size/state/icon attributes.
 
-- Start with one deck.gl `IconLayer` for the relevant device population and use its instanced rendering.
-- Use one texture atlas with a unique slot for every contract `DeviceType`, rather than separate image elements or draw calls per icon.
-- Derive both deck.gl `iconMapping` and React marker background positions from the same ordered type list; filters, cards and the map must never maintain independent type-to-glyph tables.
-- Keep the number of layers/draw calls small. Split layers only when visual behavior or update cadence differs materially.
-- Use GPU picking for ordinary point selection.
-- Do not introduce per-device event handlers or JSX.
-- Do not recreate the complete device object array for a single telemetry change.
-- Prefer stable device ordering and update only dirty visual attributes such as color, size, state, or icon index.
-
-Tens of thousands of simple icons are expected to be a normal WebGL workload. The actual limits must be measured; object count alone is not evidence that clustering or CPU culling is required.
+Десятки тысяч простых icons — обычная WebGL-нагрузка, но предел устанавливается измерением, а не
+числом объектов. Этапы 10–11 подтвердили один основной `IconLayer` и GPU status filtering на
+18 000/50 000 устройств; см. [performance-отчёт](../reports/performance.md).
 
 ## Realtime updates
-
-The intended flow is:
 
 ```text
 WebSocket deltas
     -> indexed hot store by deviceId
     -> dirty-device queue
-    -> update batch at controlled frame cadence
+    -> controlled update batch
     -> changed GPU attributes
 ```
 
-- Never trigger one React render per telemetry message.
-- Coalesce repeated updates for the same device within a batch.
-- Apply updates at a controlled cadence, initially aligned with animation frames and capped when necessary.
-- Keep initial snapshot/resync separate from incremental deltas.
-- Measure serialization, queue depth, batch application time, GPU attribute upload time, dropped frames, and end-to-end telemetry latency.
-- Consider a Web Worker only when profiling shows that clustering, indexing, decoding, or filtering blocks the main thread.
+- Не запускать React render на каждое telemetry message.
+- Coalesce повторные updates одного устройства внутри batch.
+- Initial snapshot/resync отделять от incremental deltas.
+- Измерять serialization, queue, apply/upload time, dropped frames и end-to-end latency.
+- Worker добавлять только при доказанном main-thread bottleneck в decoding/filtering/indexing.
 
-## Viewport and level of detail
+## Viewport и LOD
 
-- Keep server-side viewport and zoom filtering for floor geometry; complex plan geometry can be more expensive than device icons.
-- Show labels only for selected, alarming, or sufficiently zoomed-in devices.
-- At low zoom, reduce label and plan detail before reducing device availability.
-- Clustering is a product representation decision as well as an optimization. It must preserve visibility of warnings and critical alarms.
-- Filters by floor and system are valid product behavior and should also reduce rendering work.
+- Сохранять server viewport/zoom filtering для сложной floor geometry.
+- Labels показывать для selected/alarming или при достаточном zoom.
+- На низком zoom сначала снижать detail плана/labels, не доступность аварий.
+- Clustering — одновременно product representation и optimization; warnings/critical не теряются.
+- Floor/system filters являются поведением продукта и могут уменьшать render workload.
 
-## Spatial indexing
+## Пространственные индексы
 
-Do not require a spatial index merely to draw a tens-of-thousands-scale point layer. First benchmark rendering all relevant device instances.
+Не требовать index только ради отрисовки point layer. Он оправдан, если улучшает nearest/area/room
+queries, label placement, neighbor lookup, clustering, mixed geometry или масштаб в сотни тысяч.
 
-Use a spatial index when it materially improves:
+- quadtree — для point devices и nearest-neighbor;
+- R-tree — для bbox, rooms, zones, routes, labels и equipment size;
+- `rbush` — первый кандидат R-tree.
 
-- nearest-device queries;
-- area or rectangle selection;
-- room/zone queries;
-- label placement;
-- neighbor lookup;
-- custom clustering;
-- mixed-size geometry;
-- datasets growing toward hundreds of thousands of objects.
+Index полной stable metadata и GPU culling — независимые решения.
 
-Preferred shapes:
+## Сценарии benchmark
 
-- quadtree for predominantly point-like devices and nearest-neighbor lookup;
-- R-tree for bounding boxes, rooms, zones, routes, labels, and equipment with size;
-- `rbush` is the first library candidate for an R-tree implementation.
+Минимальная матрица:
 
-The index may operate on the full stable metadata set while the GPU continues to render all relevant instances. Rendering culling and spatial-query acceleration are separate decisions.
+1. Representative tens-of-thousands и stress fixture 50 000.
+2. Floor и all-building overview.
+3. Continuous pan/zoom, fit, pointer movement и GPU picking.
+4. Filters/selection и возврат полного набора.
+5. Normal realtime, burst и alarm color/size transitions.
+6. LOD labels и reconnect с snapshot/resync.
+7. Поддерживаемый desktop и representative mobile profile.
 
-## Benchmark scenarios
+Фиксируются frame-time percentiles, long tasks, memory, React commits, rendered instances и update
+latency. Benchmark обязан записывать GPU backend; SwiftShader нельзя напрямую сравнивать с Metal.
 
-Before accepting the device-rendering stage, measure at least:
+## Необоснованные оптимизации
 
-1. Representative datasets in the tens-of-thousands range, plus a 50,000-device stress fixture.
-2. Floor mode and all-building overview.
-3. Continuous zoom and pan.
-4. GPU picking and repeated pointer movement.
-5. Filters and selection changes.
-6. Normal realtime load and burst load.
-7. Alarm color/size changes.
-8. Labels disabled, LOD-controlled, and worst-case enabled.
-9. Reconnect followed by full snapshot/resync.
-10. A low-end supported desktop and a representative mobile browser.
-
-Record frame time percentiles rather than only average FPS. Also record long tasks, memory, React commit counts, number of rendered instances, and update latency.
-
-## Avoided premature optimizations
-
-- Do not assume Electron or another desktop wrapper makes browser rendering faster.
-- Do not add clustering solely because the dataset has tens of thousands of devices.
-- Do not add a Web Worker before identifying main-thread work worth moving.
-- Do not force all scene geometry into a single layer when layers have different LOD or update cadence.
-- Do not load or parse IFC at runtime in the browser.
+- Desktop wrapper сам по себе не ускоряет browser rendering.
+- Число устройств не является достаточным основанием для clustering.
+- Worker не добавляется без main-thread работы, которую стоит вынести.
+- Layers с разным LOD/cadence не следует насильно объединять.
+- IFC никогда не загружается и не разбирается в runtime браузера.

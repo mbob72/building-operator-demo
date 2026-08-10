@@ -51,52 +51,49 @@ source: "https://openifcmodel.cs.auckland.ac.nz/"
 
 # west_riverside_hospital
 
-## Description
+## Описание
 
-A large multi-storey hospital building donated by Wawan Solihin (Singapore) and hosted on the
-OpenIFC Model Repository by Professor Robert Amor at the University of Auckland. The dataset
-provides seven disciplines each available in both IFC 2X3 and IFC 4, making it one of the most
-comprehensive multi-schema, multi-discipline BIM datasets in the public domain.
+Большое многоэтажное здание больницы предоставлено Wawan Solihin (Сингапур) и опубликовано
+профессором Robert Amor из University of Auckland в OpenIFC Model Repository. Набор содержит семь
+дисциплин в IFC 2X3 и IFC 4 и является одним из наиболее полных открытых многодисциплинарных
+BIM-наборов с несколькими версиями схемы.
 
-The architectural model covers 8 levels (Level 1 through Level 7A, elevations 0--34000 mm).
-The structural model covers 15 levels. The mechanical model is exceptionally detailed with
-59,215 products across 11 levels.
+Архитектурная модель охватывает 8 уровней (от Level 1 до Level 7A, отметки 0–34 000 мм),
+конструктивная — 15 уровней. Подробная механическая модель содержит 59 215 продуктов на 11 уровнях.
 
-## Models
+## Модели
 
-| File | Discipline | Schema | Storeys | Products | Description |
+| Файл | Дисциплина | Схема | Этажи | Продукты | Описание |
 |------|-----------|--------|---------|----------|-------------|
-| `arc_ifc2x3.ifc` | Architecture | IFC2X3 | 8 | 15,316 | Full architectural model incl. walls, doors, windows, columns, members, plates |
-| `arc_ifc4.ifc` | Architecture | IFC4 | 8 | 15,316 | IFC4 counterpart -- identical product count |
-| `str_ifc2x3.ifc` | Structural | IFC2X3 | 15 | 2,915 | Structural frame: 1970 beams, 255 columns, slabs |
-| `str_ifc4.ifc` | Structural | IFC4 | 15 | 2,915 | IFC4 counterpart |
-| `mech_ifc2x3.ifc` | Mechanical | IFC2X3 | 11 | 59,215 | HVAC system: 8,732 duct/pipe segments, 1,064 terminals |
-| `mech_ifc4.ifc` | Mechanical | IFC4 | 11 | 59,215 | IFC4 counterpart -- 3,916 IfcPipeSegment elements |
-| `plumb_ifc2x3.ifc` | Plumbing | IFC2X3 | 5 | 26,942 | 4,308 pipe segments, 474 terminals |
-| `plumb_ifc4.ifc` | Plumbing | IFC4 | 5 | 26,942 | IFC4 counterpart |
-| `elec_ifc2x3.ifc` | Electrical | IFC2X3 | 7 | 6,305 | 1,410 flow terminals, 84 segments |
-| `elec_ifc4.ifc` | Electrical | IFC4 | 7 | 6,305 | IFC4 counterpart -- 1,272 IfcLightFixture elements |
-| `fire_ifc2x3.ifc` | Fire Alarm | IFC2X3 | 5 | 874 | Fire alarm devices |
-| `fire_ifc4.ifc` | Fire Alarm | IFC4 | 5 | 874 | IFC4 counterpart |
-| `sprinkle_ifc2x3.ifc` | Sprinklers | IFC2X3 | 5 | 38,255 | 6,228 pipe segments, 1,354 sprinkler heads |
-| `sprinkle_ifc4.ifc` | Sprinklers | IFC4 | 5 | 38,255 | IFC4 counterpart -- 1,354 IfcFireSuppressionTerminal |
+| `arc_ifc2x3.ifc` | Архитектура | IFC2X3 | 8 | 15 316 | Полная модель: стены, двери, окна, колонны, балки и плиты |
+| `arc_ifc4.ifc` | Архитектура | IFC4 | 8 | 15 316 | Аналог IFC4 с тем же числом продуктов |
+| `str_ifc2x3.ifc` | Конструкции | IFC2X3 | 15 | 2 915 | Каркас: 1 970 балок, 255 колонн и перекрытия |
+| `str_ifc4.ifc` | Конструкции | IFC4 | 15 | 2 915 | Аналог IFC4 |
+| `mech_ifc2x3.ifc` | Механика | IFC2X3 | 11 | 59 215 | HVAC: 8 732 участка воздуховодов/труб, 1 064 терминала |
+| `mech_ifc4.ifc` | Механика | IFC4 | 11 | 59 215 | Аналог IFC4, включая 3 916 `IfcPipeSegment` |
+| `plumb_ifc2x3.ifc` | Водоснабжение | IFC2X3 | 5 | 26 942 | 4 308 участков труб, 474 терминала |
+| `plumb_ifc4.ifc` | Водоснабжение | IFC4 | 5 | 26 942 | Аналог IFC4 |
+| `elec_ifc2x3.ifc` | Электрика | IFC2X3 | 7 | 6 305 | 1 410 flow terminals, 84 участка |
+| `elec_ifc4.ifc` | Электрика | IFC4 | 7 | 6 305 | Аналог IFC4, включая 1 272 `IfcLightFixture` |
+| `fire_ifc2x3.ifc` | Пожарная сигнализация | IFC2X3 | 5 | 874 | Устройства пожарной сигнализации |
+| `fire_ifc4.ifc` | Пожарная сигнализация | IFC4 | 5 | 874 | Аналог IFC4 |
+| `sprinkle_ifc2x3.ifc` | Спринклеры | IFC2X3 | 5 | 38 255 | 6 228 участков труб, 1 354 спринклерные головки |
+| `sprinkle_ifc4.ifc` | Спринклеры | IFC4 | 5 | 38 255 | Аналог IFC4, включая 1 354 `IfcFireSuppressionTerminal` |
 
-## Known Limitations
+## Известные ограничения
 
-- **No IfcSpace elements** in any model including the architectural file. Rooms and spaces are
-  not explicitly modelled as IFC spatial units; spatial analysis must rely on storey containment.
-- **IFC4 MEP files have fewer property sets** than their IFC2X3 counterparts. The
-  `Pset_DistributionFlowElementCommon` property set (containing `Reference`) was not carried
-  over during schema conversion for the mechanical, plumbing, and sprinkler models.
-- **Empty building name**: the `IfcBuilding.Name` attribute is blank in all files; the
-  `IfcProject.Name` is set to `"Project Number"`.
-- **Large unplaced element counts** in MEP files (e.g. 39,532 in mech): these are fitting and
-  accessory elements without direct spatial containment, which is typical for Revit MEP exports.
-- The fire alarm model (874 products, 12 property sets) contains minimal property data.
+- **Нет элементов `IfcSpace`**, включая архитектурный файл. Помещения не смоделированы как IFC
+  spatial units; пространственный анализ может опираться только на принадлежность этажу.
+- **В IFC4 MEP меньше property sets**, чем в IFC2X3. При конвертации mechanical, plumbing и
+  sprinkler моделей не перенесён `Pset_DistributionFlowElementCommon` с `Reference`.
+- **Пустое имя здания**: `IfcBuilding.Name` не заполнен, `IfcProject.Name` равен `"Project Number"`.
+- **Много неразмещённых MEP-элементов** (например, 39 532 в mechanical): это fittings/accessories
+  без прямой spatial containment, что типично для экспорта Revit MEP.
+- Модель пожарной сигнализации (874 продукта, 12 property sets) содержит минимум свойств.
 
-## Architectural Level Breakdown
+## Разбивка архитектурной модели по уровням
 
-| Level | Elevation (mm) | Elements |
+| Уровень | Отметка (мм) | Элементы |
 |-------|---------------|----------|
 | Level 1 | 0 | 844 |
 | Level 2 | 6,000 | 909 |

@@ -1,30 +1,30 @@
-# ADR-0002: Rendering tens of thousands of devices
+# ADR-0002: Рендеринг десятков тысяч устройств
 
-- Status: accepted as implementation guardrails
-- Date: 2026-08-07
+- Статус: принят как архитектурные ограничения
+- Дата: 2026-08-07
 
-## Context
+## Контекст
 
-The operator scene will contain a representative tens-of-thousands-scale device dataset with realtime status changes. It must remain interactive in floor and building-overview modes. The precise device count is not a contractual constant, and optimizations must not be justified only by a round number.
+Сцена содержит десятки тысяч устройств с realtime status changes и должна оставаться интерактивной
+в floor/building режимах. Точное число не является контрактной константой; оптимизация требует
+измерений, а не обоснования круглым числом.
 
-## Decision
+## Решение
 
-1. Render devices with deck.gl `IconLayer` instancing and a texture atlas.
-2. Keep devices out of the React DOM and keep the WebGL subsystem independent of component structure.
-3. Begin by rendering the relevant device population without mandatory CPU viewport culling. Use deck.gl GPU picking.
-4. Store stable metadata separately from hot telemetry. Apply coalesced telemetry batches to dirty GPU attributes at a controlled cadence.
-5. Use LOD primarily for plan detail and labels. Alarm visibility must survive clustering or LOD decisions.
-6. Add quadtree/R-tree indexing only for measured spatial-query or scale needs. `rbush` is the initial candidate for mixed bounding-box data.
-7. Decide whether to add clustering, workers, binary attributes, or further culling from reproducible benchmarks on target hardware.
+1. Рендерить устройства instanced deck.gl `IconLayer` с texture atlas.
+2. Не создавать для устройств React/DOM nodes; WebGL не зависит от структуры компонентов.
+3. Начать без обязательного CPU viewport culling, использовать GPU picking.
+4. Хранить stable metadata отдельно от hot telemetry и обновлять dirty GPU attributes batches.
+5. Применять LOD прежде всего к плану и labels; alarms должны сохранять видимость.
+6. Добавлять quadtree/R-tree (`rbush`) только при измеренной потребности spatial queries.
+7. Clustering, workers, binary attributes и culling выбирать по воспроизводимому benchmark.
 
-## Consequences
+## Последствия
 
-- The initial implementation remains small and lets the GPU handle the workload it is designed for.
-- Realtime-store and layer-update design become more important than React list optimization.
-- Server viewport filtering remains useful for complex floor geometry and future large spatial datasets.
-- Later optimization work requires before/after measurements in `reports/performance.md`.
-- The benchmark must cover a 50,000-device stress fixture even if the representative product fixture is smaller.
+- GPU выполняет подходящую ему instanced-нагрузку, а реализация остаётся небольшой.
+- Дизайн realtime store/layer updates важнее оптимизации React-списков.
+- Server viewport filtering сохраняется для сложной геометрии.
+- Before/after evidence хранится в [`reports/performance.md`](../../reports/performance.md).
+- Benchmark обязательно включает stress fixture на 50 000 устройств.
 
-## Supporting guidance
-
-See [`docs/rendering-guidelines.md`](../rendering-guidelines.md).
+Подробности: [рекомендации по рендерингу](../rendering-guidelines.md).

@@ -1,9 +1,9 @@
-# Stage 8–9 report — reliability and full-product automated acceptance
+# Отчёт этапов 8–9 — надёжность и полный automated acceptance
 
 - Дата реализации: 2026-08-10
 - Дата приёмки: 2026-08-10
 - Статус: завершён и принят пользователем
-- Граница: объединённые Stage 8 и Stage 9; Stage 10 не начат
+- Граница: объединённые этапы 8 и 9; на момент отчёта этап 10 не был начат
 
 ## Результат
 
@@ -18,7 +18,7 @@ state или восстановления socket. Если исход POST об�
 не ставит команду в background queue: только явная кнопка повторяет точный payload с тем же
 idempotency key.
 
-## Контракты и hot state
+## Контракты и оперативное состояние
 
 - `CommandDraftSchema` хранит `clientRequestId` и nullable `requestedAt`; backend states и UI draft
   остаются раздельными.
@@ -31,7 +31,7 @@ idempotency key.
 - Executed command может получить поздний `resultTelemetryRevision`, но не сменить terminal outcome.
 - JSON Schema artifacts пересозданы из runtime Zod schemas через `npm run contracts:generate`.
 
-## Disconnect и recovery
+## Разрыв соединения и восстановление
 
 - Reconnect использует backoff 250–5 000 мс и после успешного open снова начинается с 250 мс.
 - Resume всегда читает актуальные `streamId`/`sequence` непосредственно из hot store.
@@ -42,7 +42,7 @@ idempotency key.
 - `CommandSubmissionError` различает definitive HTTP rejection и network/invalid-response outcome,
   для которого нужен exact explicit retry.
 
-## UI и burst behaviour
+## UI и поведение при burst
 
 - `roomId: null` отображается в карточке как `Unassigned`.
 - Building alarm panel сохраняет полные counts/state, но рендерит максимум 50 строк.
@@ -56,7 +56,7 @@ idempotency key.
 
 ## Автоматические проверки
 
-Unit/contract/API/component suite: 23 test files, 99 tests.
+Набор unit/contract/API/component проверок: 23 файла, 99 тестов.
 
 Дополнительное reliability coverage включает:
 
@@ -94,5 +94,5 @@ alarm acknowledge/locate и critical command. В command части test proxy �
 
 ## Следующий этап
 
-Stage 8–9 завершён и принят. Stage 10 performance benchmark не начат и требует
-отдельного разрешения пользователя.
+Этапы 8–9 завершены и приняты. После этого пользователь отдельно разрешил объединённые этапы
+10–11; их performance benchmark описан в `reports/performance.md`.

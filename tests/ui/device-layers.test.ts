@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  createDeviceIconLayer,
   deviceDataRanges,
   partitionDeviceItems,
   statusForDevice,
@@ -43,5 +44,29 @@ describe('device layer data preparation', () => {
         { startRow: 1, endRow: 3 },
         { startRow: 4, endRow: 5 },
       ]);
+  });
+
+  it('keeps the complete data array and filters visibility on the GPU', () => {
+    const visible = makeDevice('visible');
+    const hidden = makeDevice('hidden');
+    const layer = createDeviceIconLayer({
+      id: 'devices',
+      data: [visible, hidden],
+      getDevice: (device) => device,
+      getPosition: (device) => [device.position.x, device.position.y],
+      statusByDeviceId: new Map(),
+      selectedDeviceId: undefined,
+      zoom: 1,
+      sizeMinPixels: 8,
+      dataDiff: undefined,
+      visibleDeviceIds: new Set([visible.id]),
+    });
+
+    expect(layer.props.data).toEqual([visible, hidden]);
+    const getFilterValue = layer.props.getFilterValue;
+    if (typeof getFilterValue !== 'function') throw new Error('filter accessor is unavailable');
+    expect(getFilterValue(visible, {} as never)).toBe(1);
+    expect(getFilterValue(hidden, {} as never)).toBe(0);
+    expect(layer.props.filterRange).toEqual([1, 1]);
   });
 });

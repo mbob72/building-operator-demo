@@ -10,6 +10,7 @@ import {
 import type { StateSnapshot } from '../../shared/api-contracts';
 import type { ServerRealtimeMessage } from '../../shared/realtime-contracts';
 import { isPriorityStatus } from './device-visuals';
+import { recordRealtimeBatch } from './performance-metrics';
 
 export type RealtimeConnectionStatus =
   | 'idle'
@@ -42,7 +43,6 @@ export interface RealtimeHotSnapshot {
   version: number;
   statusVersion: number;
   priorityMembershipVersion: number;
-  priorityMembershipChanged: boolean;
 }
 
 const commandStateRank: Record<CommandRecord['state'], number> = {
@@ -131,7 +131,6 @@ const emptySnapshot = (): RealtimeHotSnapshot => ({
   version: 0,
   statusVersion: 0,
   priorityMembershipVersion: 0,
-  priorityMembershipChanged: false,
 });
 
 export class RealtimeHotStore {
@@ -206,7 +205,6 @@ export class RealtimeHotStore {
       version: this.snapshot.version + 1,
       statusVersion: this.snapshot.statusVersion + 1,
       priorityMembershipVersion: this.snapshot.priorityMembershipVersion + 1,
-      priorityMembershipChanged: true,
     });
   }
 
@@ -233,6 +231,7 @@ export class RealtimeHotStore {
   }
 
   applyBatch(batch: EventBatch): ApplyBatchResult {
+    const applyStartedAt = performance.now();
     if (batch.streamId !== this.snapshot.streamId) return 'stream-mismatch';
     if (batch.toSequence <= this.snapshot.sequence) return 'duplicate';
     const freshEvents = batch.events.filter((item) => item.sequence > this.snapshot.sequence);
@@ -310,10 +309,12 @@ export class RealtimeHotStore {
       statusVersion: this.snapshot.statusVersion + (statusChanged ? 1 : 0),
       priorityMembershipVersion: this.snapshot.priorityMembershipVersion
         + (priorityMembershipChanged ? 1 : 0),
-      priorityMembershipChanged: statusChanged
-        ? priorityMembershipChanged
-        : this.snapshot.priorityMembershipChanged,
     });
+    recordRealtimeBatch(
+      freshEvents.length,
+      batch.emittedAt,
+      performance.now() - applyStartedAt,
+    );
     return 'applied';
   }
 }

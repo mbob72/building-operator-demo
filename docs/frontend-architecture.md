@@ -1,9 +1,9 @@
-# Frontend architecture
+# Архитектура frontend
 
 Подробный пошаговый путь данных от HTTP/WebSocket до компонентов и deck.gl описан в [`frontend-data-consumption.md`](frontend-data-consumption.md). Взаимодействие `RealtimeClient` и `RealtimeHotStore` разобрано отдельно в [`realtime-client-and-hot-store.md`](realtime-client-and-hot-store.md).
 
 - Актуально на: 2026-08-10
-- Текущий статус: объединённый Stage 8–9 завершён и принят; Stage 10 не начат
+- Текущий статус: объединённые этапы 10–11 завершены и приняты; MVP завершён
 - Назначение: живое описание реализованного frontend; обновляется при каждом этапе и существенном изменении data flow.
 
 ## Пользовательский результат
@@ -69,11 +69,11 @@ POST /api/v1/commands   -> pending reconciliation -> indexed commands
 
 Каждый этаж содержит один базовый `floor-shell`, видимый во всём поддерживаемом zoom. Если успешный scene response всё же пуст, `meta.emptyReason` отличает viewport вне этажа, отсутствие spatial features и LOD filtering. `FloorScene` показывает оператору центральный diagnostic empty-state с подсказкой Fit; `BuildingOverview` выводит количество пустых floor responses в status overlay. Loading и transport error остаются отдельными состояниями.
 
-### Stable device catalog
+### Стабильный каталог устройств
 
 `DeviceMetadata` содержит имя, тип, протокол, floor-local позицию, provenance, binding и capabilities. Status намеренно отсутствует. Stage 6 постоянно кеширует building catalog 5 минут, а floor scope вычисляет локально. Это позволяет `AlarmPanel` перейти к устройству любого этажа без дополнительного запроса; pan/zoom и telemetry/alarm events каталог не перезапрашивают.
 
-### Stage 5 realtime hot state
+### Realtime hot state этапа 5
 
 Building-scoped `StateSnapshot` загружается сырым abortable HTTP-запросом прямо из `useRealtimeBootstrap` и сразу заменяет hot store; TanStack Query не хранит копию operational state. После этого `RealtimeClient` открывает WebSocket, отправляет `resume(streamId, afterSequence)` и применяет только непрерывные `event.batch`. Duplicate sequence игнорируется; gap, смена stream и неизвестное локальное состояние запускают такой же прямой HTTP snapshot resync. После disconnect клиент переподключается с exponential backoff 250–5 000 мс и повторно использует последний cursor.
 
@@ -174,7 +174,7 @@ Operational snapshot больше не имеет query key: `operator-queries.t
 
 На следующих этапах этот раздел обновляется при любом изменении query keys, cache/stale policy, состава Zustand/hot store, правил scope или client-side filtering/selection.
 
-## Stage 6 alarm consumption
+## Потребление аварий этапа 6
 
 `alarmsById` приходит из authoritative snapshot и обновляется полным `alarm.upsert` в общем ordered stream. `AlarmPanel` подписывается на identity этой map и `statusByDeviceId`, а чистые selectors сортируют lifecycle в порядке `active → acknowledged → resolved`, фильтруют severity/state и выбирают один strongest unresolved alarm на устройство. Stable type/protocol берутся из building catalog по `deviceId`, текущий status — из hot store.
 
@@ -184,7 +184,7 @@ Operational snapshot больше не имеет query key: `operator-queries.t
 
 `Locate` находит metadata в building catalog, одним Zustand transition переключает floor mode, выбирает этаж и устройство и очищает device filters. Alarm panel остаётся открытым слева, а карточка устройства появляется справа, поэтому оператор сохраняет контекст списка. На узком экране overlays делят сцену по вертикали. Карточка читает alarms и telemetry независимо и показывает audit author/time после acknowledgement. `DeviceVisualMarkers` даёт toolbar filters, alarm rows и selected-device card единый визуальный язык: atlas icon типа, краткий protocol badge и цветной квадрат текущего telemetry status; severity/state аварии при этом остаются отдельными признаками.
 
-## Stage 7 command consumption
+## Потребление команд этапа 7
 
 `CommandControls` читает immutable capability выбранного `DeviceMetadata` и создаёт schema-shaped `CommandDraft` в Zustand. Переключение capability или устройства заменяет draft; закрытие карточки очищает его. `setOnOff` использует boolean select, `setSetpoint` — numeric input с contract `minimum`, `maximum` и `step`.
 
@@ -192,7 +192,7 @@ Operational snapshot больше не имеет query key: `operator-queries.t
 
 Карточка показывает не более пяти последних commands устройства. Каждая запись содержит три отдельные строки: immutable desired intent, backend state и independently selected actual telemetry. Сначала `executed` меняет backend badge; только более поздний `telemetry.patch` меняет `Actual`. Frontend никогда не подставляет intent в telemetry самостоятельно.
 
-## Stage 8–9 reliability boundary
+## Граница надёжности этапов 8–9
 
 `RealtimeHotStore` применяет batch атомарно и reconciles alarm/command records монотонно. Полный
 duplicate и stale entity revision не меняют domain data; overlap batch применяет только свежий
@@ -212,20 +212,20 @@ Alarm maps сохраняют все записи и полные counts, но `
 
 ## Floor и building rendering
 
-### FloorScene
+### `FloorScene`
 
 - `FloorScene` — тонкая JSX-композиция без загрузки данных и конструирования deck.gl layers в render body;
 - `useFloorScene` владеет камерой, auto-fit, debounced/abortable scene query и GPU picking;
 - `useFloorSceneLayers` делит features по geometry type и создаёт architecture/device/alarm/selection layers;
 - fit вычисляется из bounds выбранного этажа;
 - архитектура запрашивается по реальному bbox камеры;
-- отфильтрованные устройства передаются в два instanced `IconLayer`;
+- полный scoped catalog передаётся в один instanced `IconLayer`, а visible IDs фильтруются на GPU;
 - unresolved alarms текущего этажа передаются в отдельный `ScatterplotLayer` независимо от device filters;
 - picking ограничен device layer IDs;
 - карточка показывается только для устройства текущего этажа.
 - нижний status overlay разделяет geometry и device/zoom metrics на две строки; полупрозрачный фон с blur сохраняет читаемость, не перехватывая события сцены.
 
-### BuildingOverview
+### `BuildingOverview`
 
 - этажи раскладываются в сетку 4 колонки на desktop и 2 на mobile;
 - floor-local координаты временно смещаются на layout offset;
@@ -239,7 +239,8 @@ Alarm maps сохраняют все записи и полные counts, но `
 ```mermaid
 flowchart TB
     SceneFeatures["scene.features"]
-    Devices["filtered devices"]
+    Devices["stable scoped devices"]
+    Visible["visible device IDs"]
     Telemetry["status by deviceId"]
     Alarms["unresolved alarm by deviceId"]
 
@@ -247,10 +248,9 @@ flowchart TB
     SceneFeatures --> Paths["PathLayer<br/>walls · doors · windows"]
     SceneFeatures --> SceneLabels["TextLayer<br/>plan labels"]
 
-    Devices --> Normal["IconLayer<br/>normal · offline"]
-    Devices --> Priority["IconLayer<br/>warning · critical"]
-    Telemetry --> Normal
-    Telemetry --> Priority
+    Devices --> DeviceLayer["IconLayer<br/>stable order"]
+    Visible --> DeviceLayer
+    Telemetry --> DeviceLayer
     Devices --> Selection["ScatterplotLayer<br/>selected halo"]
     Devices --> Hover["one React tooltip<br/>only on pointer hover"]
     Devices --> AlarmContours["ScatterplotLayer<br/>alarm contours"]
@@ -259,18 +259,18 @@ flowchart TB
     Polygons --> Composition["OrthographicView composition"]
     Paths --> Composition
     SceneLabels --> Composition
-    Normal --> Composition
-    Priority --> Composition
+    DeviceLayer --> Composition
     Selection --> Composition
     Hover --> Composition
     AlarmContours --> Composition
 ```
 
-Порядок слоёв существенен: warning/critical `IconLayer` идёт после обычного device layer, поэтому при визуальном пересечении приоритетные состояния остаются сверху.
+Общие правила вынесены в `device-layers.ts`: один `IconLayer` использует общий atlas, status
+color/size, GPU `DataFilterExtension` и `_dataDiff`. `SceneControls` задаёт одинаковый zoom/fit.
 
-Общие для двух renderer правила вынесены из компонентов: `device-layers.ts` индексирует status, делит normal/priority instances и создаёт одинаково настроенный `IconLayer`, а `SceneControls` реализует единые zoom/fit controls. Поэтому floor и overview не расходятся по цветам, размерам, picking-настройкам и шагу zoom.
-
-Value-only telemetry batch не пересобирает device layers: status map, renderer version и instance arrays сохраняют identity. При изменении status hot store публикует `dirtyStatusDeviceIds`; `deviceDataRanges()` объединяет соседние индексы и передаёт их в deck.gl `_dataDiff`, поэтому пересчитываются только затронутые GPU attributes. Если status переводит устройство между normal/offline и warning/critical, меняется membership version и оба слоя безопасно перегруппируются полностью.
+Value-only telemetry batch сохраняет layer identity. При status change store публикует
+`dirtyStatusDeviceIds`; `deviceDataRanges()` обновляет только затронутые GPU attributes. Переход
+normal/offline ↔ warning/critical не меняет порядок массива и не создаёт полную перегруппировку.
 
 ## Zoom и LOD
 
@@ -288,7 +288,7 @@ user input / Fit
    └── fixed-pixel device and selection marker size
 ```
 
-Architecture bands:
+Диапазоны архитектурного LOD:
 
 - `overview`: zoom `< 1.7`;
 - `standard`: `1.7 <= zoom < 4.1`;
@@ -298,7 +298,7 @@ Architecture bands:
 
 Device name labels не размножаются при приближении. На сцене существует максимум один React tooltip — только для instance непосредственно под курсором; он показывает name, type, operational status и этаж. Tooltip исчезает при уходе курсора и не перехватывает pointer events. Выбранное устройство вместо постоянной подписи получает независимый 17 px cyan/white halo под icon, одинаковый во всех zoom и в обоих renderer. Архитектурные подписи по-прежнему регулируются scene LOD.
 
-## Search и multi-select filters
+## Поиск и multi-select фильтры
 
 Поиск case-insensitive по `device.name` и `device.id`. Type и protocol сравниваются со stable catalog; status — с отдельным hot status map. Для каждой категории Zustand хранит массив выбранных значений. Внутри одной строки значения объединяются как OR, три категории и search — как AND. Пустая категория даёт пустой результат; отсутствие telemetry трактуется как `unknown`.
 
@@ -308,11 +308,11 @@ Toolbar имеет основную строку и три горизонтал�
 
 `Reset` очищает search/type/protocol/status, не меняя mode и выбранный этаж.
 
-## Selection и GPU picking
+## Выбор устройства и GPU picking
 
 Hover использует штатный deck.gl picking и создаёт ровно один `SceneDeviceTooltip`. Клик по canvas вызывает `DeckGLRef.pickObject()` с radius 4 и только с device layer IDs. Возвращённый instance преобразуется в `deviceId`, который хранится в Zustand и отображается отдельным selection halo. React создаёт ровно одну `DeviceCard`; её selector подписан на telemetry object только выбранного `deviceId`, поэтому updates других устройств не вызывают render карточки.
 
-## Основные frontend-файлы
+## Основные файлы frontend
 
 | Файл | Ответственность |
 |---|---|
@@ -342,7 +342,7 @@ Hover использует штатный deck.gl picking и создаёт ро
 | `src/client/src/DeviceCard.tsx` | selected device metadata + live telemetry/alarm selectors |
 | `src/client/src/CommandControls.tsx` | capability draft, critical confirmation, command submission и recent lifecycle |
 | `src/client/src/SceneControls.tsx` | общие zoom/fit controls двух renderer |
-| `src/client/src/device-layers.ts` | общие status partition и фабрика device `IconLayer` |
+| `src/client/src/device-layers.ts` | фабрика единого device `IconLayer`, GPU status filtering и dirty ranges |
 | `src/client/src/device-visuals.ts` | contract-complete 1:1 type/atlas mapping, status colors, icon LOD |
 | `src/client/public/device-atlas.svg` | 19 уникальных 32×32 glyph slots в порядке `DeviceTypeSchema.options` |
 | `src/client/src/scene-visuals.ts` | scene colors и zoom bands |
@@ -351,7 +351,8 @@ Hover использует штатный deck.gl picking и создаёт ро
 
 ## Тестовые границы
 
-- Чистые unit-тесты фиксируют уникальный atlas slot для каждого contract device type, status partition, dirty data ranges, поиск/filter combinations, hover-tooltip content/clamping и параметры selection halo.
+- Чистые unit-тесты фиксируют atlas slots, GPU visibility accessor, dirty data ranges, filters,
+  tooltip и selection halo.
 - Hot-store/client tests фиксируют direct HTTP bootstrap, atomic snapshot replacement, contiguous batches, stale revisions, gaps, resync, reconnect backoff и одно notification на batch.
 - Selector component test доказывает, что update другого устройства не рендерит consumer выбранного устройства.
 - Hook-тест `useFloorScene` с fake timers фиксирует 100 мс debounce, bbox/zoom request и abort устаревшего запроса при смене камеры.
@@ -361,11 +362,21 @@ Hover использует штатный deck.gl picking и создаёт ро
 - Command component/hot-store tests проверяют on/off/setpoint drafts, explicit confirmation, desired/backend/actual separation и защиту lifecycle от HTTP regression; Chromium проходит confirmable command до `executed`.
 - Reliability tests проверяют overlap/duplicate/stale/gap/unknown state, atomic 500-alarm burst, bounded overlays, nullable room, single-flight resync, stable idempotent retry и command GET fallback. Chromium разрывает WebSocket при доступном HTTP, получает terminal command через polling и затем восстанавливает ordered stream/actual telemetry.
 
-## Ограничения и следующий шаг
+## Граница производительности этапов 10–11
+
+- Renderer получает стабильный полный device array; `DataFilterExtension` меняет видимость на GPU.
+- Один основной `IconLayer` заменил normal/priority partition, чтобы status transition не менял
+  большие массивы и не вызывал полную перестройку GPU attributes.
+- Realtime обновляет только dirty data ranges; React/DOM cardinality не зависит от catalog size.
+- `performance-metrics.ts` собирает React commit durations и realtime apply/end-to-end latency.
+- Полная матрица 18 000/50 000 × desktop/mobile прошла; результаты в
+  [`reports/performance.md`](../reports/performance.md).
+
+## Ограничения
 
 - Catalog и authoritative hot snapshot передаются для здания; локальный floor subset не требует сети. Device spatial culling/clustering не добавлялись без benchmark.
 - Overview делает до восьми scene queries на новый zoom band; ответы кешируются, но пока не объединены в отдельный backend batch endpoint.
 - Главный JS chunk около 1 МБ minified из-за deck.gl; code splitting оставлен как измеряемая оптимизация, а не блокер MVP.
 - Realtime replay, command records и idempotency остаются process-local; browser recovery не превращает их в durable delivery.
 
-Stage 8–9 завершён и принят. Stage 10 performance benchmark не начат.
+Этапы 10–11 завершены и приняты пользователем. Текущий MVP завершён.

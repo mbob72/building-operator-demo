@@ -49,7 +49,7 @@ realtime-contracts
   └── EventBatchMessageSchema
 ```
 
-### Client messages
+### Сообщения client
 
 ```text
 ClientRealtimeMessage
@@ -57,7 +57,7 @@ ClientRealtimeMessage
   └── resume
 ```
 
-### Server messages
+### Сообщения server
 
 ```text
 ServerRealtimeMessage
@@ -67,7 +67,7 @@ ServerRealtimeMessage
   └── heartbeat
 ```
 
-### Realtime events
+### События realtime
 
 ```text
 RealtimeEvent
@@ -77,7 +77,7 @@ RealtimeEvent
   └── catalog.invalidated
 ```
 
-## Backend: RealtimeEngine
+## Backend: `RealtimeEngine`
 
 [`RealtimeEngine`](../src/server/realtime-engine.ts#L93) является in-memory authoritative владельцем hot operational state.
 
@@ -138,7 +138,7 @@ rawEvents
 
 Одинаковый повторный record не создаёт новый event.
 
-### command lifecycle
+### Жизненный цикл команды
 
 [`createCommand()`](../src/server/realtime-engine.ts#L283):
 
@@ -169,7 +169,7 @@ rawEvents
 
 Endpoint регистрируется в [`registerRealtimeRoute()`](../src/server/realtime-route.ts#L28).
 
-### Connection lifecycle
+### Жизненный цикл соединения
 
 Для каждого socket route:
 
@@ -203,7 +203,7 @@ replay.length > 0
 
 Обработка сообщения синхронна, поэтому simulator callback не может вклиниться между вычислением replay и установкой listener в том же event-loop turn.
 
-## Frontend: bootstrap
+## Frontend: начальная загрузка
 
 [`useRealtimeBootstrap()`](../src/client/src/use-realtime-state.ts#L15) является composition root realtime frontend.
 
@@ -228,7 +228,7 @@ Store singleton переживает повторный mount в рамках br
 
 [`RealtimeClient`](../src/client/src/realtime-client.ts#L37) владеет transport lifecycle, но не доменным состоянием.
 
-### Что хранит client
+### Что хранит клиент
 
 | Поле | Назначение |
 |---|---|
@@ -240,7 +240,7 @@ Store singleton переживает повторный mount в рамках br
 
 Cursor внутри client не кэшируется. Каждый `resume()` читает актуальные `streamId` и `sequence` из store.
 
-### Обработка server messages
+### Обработка сообщений server
 
 | Message | Действие |
 |---|---|
@@ -273,7 +273,7 @@ Socket во время HTTP request остаётся открытым. Если 
 
 [`RealtimeHotStore`](../src/client/src/realtime-hot-store.ts#L74) владеет client authoritative hot state и cursor.
 
-### Snapshot shape
+### Форма snapshot
 
 | Поле | Назначение |
 |---|---|
@@ -289,7 +289,7 @@ Socket во время HTTP request остаётся открытым. Если 
 | `statusVersion` | Только изменение device status |
 | `priorityMembershipVersion` | Изменение membership priority status |
 
-### applyBatch stages
+### Этапы `applyBatch`
 
 ```text
 1. stream identity check
@@ -303,7 +303,7 @@ Socket во время HTTP request остаётся открытым. Если 
 
 Telemetry patch сначала мержится с current full record, затем весь результат повторно проходит `DeviceTelemetrySchema`. Это защищает store от семантически невозможного состояния.
 
-### Direct upserts
+### Прямые upsert
 
 `upsertAlarm()` и `upsertCommand()` используются для reconciliation HTTP mutation response. Они не изменяют `streamId` и `sequence`.
 
@@ -315,7 +315,7 @@ pending < accepted < executed | failed | timedOut
 
 Это предотвращает regression от более медленного HTTP response.
 
-## React consumption
+## Потребление в React
 
 [`useRealtimeSelector()`](../src/client/src/use-realtime-state.ts#L7) использует `useSyncExternalStore`.
 
@@ -339,7 +339,7 @@ WebSocket batch
 
 Value-only telemetry update создаёт новую telemetry map, но сохраняет identity status map. Это не заставляет status-oriented renderer перестраиваться.
 
-## Validation boundaries
+## Границы валидации
 
 | Граница | Schema/check |
 |---|---|
@@ -389,7 +389,7 @@ Server считает socket listener подключённым после отп
 | Atomic store, duplicate, revision и dirty state | [`realtime-hot-store.test.ts`](../tests/ui/realtime-hot-store.test.ts) |
 | Bootstrap и selective React subscription | [`use-realtime-state.test.tsx`](../tests/ui/use-realtime-state.test.tsx) |
 
-## Checklist перед изменением realtime
+## Контрольный список перед изменением realtime
 
 - Изменён runtime Zod contract, а не generated JSON Schema.
 - Новый event получает global sequence через `publishEvents()`.

@@ -1,30 +1,27 @@
-# Stage 0 verification report
+# Отчёт о проверке этапа 0
 
-Date: 2026-08-07
+Дата: 2026-08-07
 
-## Delivered
+## Результат
 
-- Runtime-validated viewport scene contract.
-- Floor list and viewport scene endpoints.
-- Server-side bbox intersection and zoom-based LOD.
-- Real West Riverside Hospital Level 1 geometry with no devices.
-- Reproducible IFC-to-2D horizontal-section pipeline.
-- Prepared scene: 1,062 features (473 wall sections, 147 columns, 303 window/curtain-wall sections, and 139 door sections).
-- Orthographic deck.gl viewer with pan, zoom, fit, and request diagnostics.
+- Runtime-validated viewport scene contract и endpoints списка этажей/сцены.
+- Server bbox intersection и zoom LOD.
+- Реальная геометрия Level 1 West Riverside Hospital без устройств.
+- Воспроизводимый IFC-to-2D horizontal-section pipeline.
+- 1 062 features: 473 стены, 147 колонн, 303 окна/витража и 139 дверей.
+- Ортографический deck.gl viewer с pan/zoom/fit и request diagnostics.
 
-## Checks
+## Проверки
 
-- TypeScript strict type checking: passed.
-- API and viewport unit tests: 6 passed.
-- Chromium E2E: 1 passed.
-- Production build: passed.
-- Dependency audit during install: 0 vulnerabilities.
+- TypeScript strict typecheck — пройден.
+- API/viewport unit tests — 6 пройдено.
+- Chromium E2E — 1 пройден.
+- Production build — пройден; dependency audit — 0 vulnerabilities.
 
-## Known limitations
+## Известные на тот момент ограничения
 
-- Only Level 1 architecture is currently extracted; other floors and disciplines are out of scope for Stage 0.
-- Rooms are not labelled because the source model has no useful `IfcSpace` entities; automatic room inference is outside MVP scope.
-- The backend performs a linear feature scan; no spatial index is justified yet.
-- JSON transport has not been compared with vector tiles using representative BIM geometry.
-- The initial deck.gl production JavaScript chunk is approximately 969 kB minified / 285 kB gzip and has not yet been code-split.
-- Full-building performance benchmarking belongs to a later approved stage.
+- Извлечён только Level 1; остальные этажи/дисциплины находились вне этапа 0.
+- Rooms не подписаны из-за отсутствия полезных `IfcSpace`; inference вне MVP.
+- Backend выполнял linear feature scan, JSON ещё не сравнивался с vector tiles.
+- deck.gl chunk был около 969 kB minified / 285 kB gzip без code splitting.
+- Full-building performance benchmark был отложен до этапов 10–11 и теперь выполнен.

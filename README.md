@@ -1,75 +1,80 @@
-# Building operator MVP
+# MVP операторской системы здания
 
-Stage 0 proves viewport-aware scene delivery for real West Riverside Hospital geometry. Stage 1 defines product and operational contracts. Stage 2 adds eight architectural floors, a representative 18,000-device catalog, and a 50,000-device stress fixture. Stage 3 renders a one-floor device slice. Stage 4 adds floor/building modes, filters and renderer LOD. Stage 5 adds an authoritative snapshot, ordered WebSocket telemetry, replay/resync, selective hot-state subscriptions and dirty GPU updates. Stage 6 adds alarm lifecycle and the shared 19-type visual language. Stage 7 adds idempotent simulated commands, confirmation for critical capabilities, realtime lifecycle, and explicit desired/backend/actual state separation.
+Проект последовательно реализует 2D-рабочее место оператора для West Riverside Hospital: от
+viewport-aware геометрии и контрактов до восьми этажей, каталогов на 18 000/50 000 устройств,
+WebGL-рендеринга, ordered realtime, аварий, симулированных команд и полного автоматизированного
+acceptance. Этапы 10–11 добавляют воспроизводимый performance benchmark и финализацию MVP.
 
-Current status: combined Stage 8–9 is complete and accepted; Stage 10 has not started.
+Текущий статус: объединённые этапы 10–11 завершены и приняты; MVP завершён.
 
-## Run
+## Запуск
 
-Requires Node.js 22 or newer.
+Требуется Node.js 22 или новее.
 
 ```bash
 npm install
 npm run dev
 ```
 
-Open <http://127.0.0.1:5173>. The scene API listens on <http://127.0.0.1:3001>.
+Интерфейс: <http://127.0.0.1:5173>. Scene API: <http://127.0.0.1:3001>.
 
-## Verify
+## Проверка
 
 ```bash
 npm run verify
 npm run test:e2e
+npm run test:performance
 ```
 
-Runtime Zod contracts live in `src/shared`. Generate or check the backend-independent Draft 2020-12 schemas with:
+Runtime Zod-контракты находятся в `src/shared` и являются source of truth. Независимые от backend
+схемы Draft 2020-12 генерируются и проверяются командами:
 
 ```bash
 npm run contracts:generate
 npm run contracts:check
 ```
 
-See [`docs/product.md`](docs/product.md), [`docs/architecture.md`](docs/architecture.md), [`docs/architecture-todo.md`](docs/architecture-todo.md), [`docs/frontend-architecture.md`](docs/frontend-architecture.md), [`docs/frontend-data-consumption.md`](docs/frontend-data-consumption.md), the Confluence-oriented [`docs/realtime-data-flow-confluence.md`](docs/realtime-data-flow-confluence.md), [`docs/realtime-client-and-hot-store.md`](docs/realtime-client-and-hot-store.md), [`docs/backend-architecture.md`](docs/backend-architecture.md), and the stage reports through [`reports/stage-eight-nine.md`](reports/stage-eight-nine.md).
+Основные документы: [продукт](docs/product.md), [архитектура](docs/architecture.md),
+[frontend](docs/frontend-architecture.md), [backend](docs/backend-architecture.md),
+[путь данных](docs/frontend-data-consumption.md), [realtime](docs/realtime-data-flow-confluence.md),
+[deployment](docs/deployment.md), [performance-отчёт](reports/performance.md) и
+[итог этапов 10–11](reports/stage-ten-eleven.md).
 
-## Production mode
+## Production-режим
 
-The production server serves both the built frontend and `/api/*` from one origin:
+Production server выдаёт собранный frontend и `/api/*` с одного origin:
 
 ```bash
 npm run build
 NODE_ENV=production HOST=127.0.0.1 PORT=4174 npm start
 ```
 
-Open <http://127.0.0.1:4174>. `npm run verify` includes a production smoke test for the HTML entry point and viewport scene API.
+Откройте <http://127.0.0.1:4174>. `npm run verify` включает production smoke-проверку HTML и
+viewport scene API.
 
-## Live demo
+## Публичная демонстрация
 
-Open the public building operator demo at <https://building-operator-demo.onrender.com>.
+Демонстрация: <https://building-operator-demo.onrender.com>. Render Blueprint находится в
+`render.yaml`, GitHub Actions — в `.github/workflows/ci.yml`. Подробности: [deployment](docs/deployment.md).
 
-The repository includes a Render Blueprint in `render.yaml` and GitHub Actions in `.github/workflows/ci.yml`. Render is configured to deploy the `main` branch only after CI checks pass. See [`docs/deployment.md`](docs/deployment.md).
+## Архитектура сцены
 
-## Stage 0 architecture
+Браузер переводит ортографическую камеру в bbox мировых координат и вместе с zoom отправляет его
+в `POST /api/scene/query`. API фильтрует геометрию по bbox и zoom range; после pan/zoom клиент с
+debounce заменяет WebGL layers полученным подмножеством.
 
-The browser converts the current orthographic view to a world-coordinate bounding box and sends it with the current zoom to `POST /api/scene/query`. The API filters floor geometry by bbox and feature zoom range. Panning or zooming triggers a debounced request and replaces the WebGL layers with the returned scene subset.
+IFC в браузере не разбирается. Компактные сцены заранее построены из IFC горизонтальным сечением
+на высоте 1,2 м и содержат стены, колонны, двери, окна/витражи и лестницы.
 
-The browser does not parse IFC. The checked-in compact scene was produced offline from `arc_ifc2x3.ifc` using a horizontal section 1.2 metres above Level 1. It contains walls, columns, doors, windows/curtain walls, and stairs where they intersect the section.
+## Воспроизведение данных
 
-## Reproduce the offline data
-
-The source IFC is about 80 MB and is excluded from version control. Python 3.11 is recommended because binary IfcOpenShell wheels are available for it.
+Исходные IFC занимают около 80 МБ и не хранятся в Git. Для binary wheels IfcOpenShell рекомендуется
+Python 3.11.
 
 ```bash
 python3.11 -m venv .venv
 .venv/bin/pip install -r requirements-data.txt
 scripts/data-pipeline/download-west-riverside.sh
-npm run data:floor
-```
-
-The source model is West Riverside Hospital from IFC-Bench/OpenIFC Model Repository and is licensed under CC BY 3.0. The downloaded source checksum and attribution files live under `data/source`.
-
-Generate and validate the full Stage 2 dataset with:
-
-```bash
 npm run data:floors
 npm run data:devices
 npm run data:stress
@@ -77,4 +82,8 @@ npm run data:validate
 npm run data:reproducibility
 ```
 
-The representative fixture contains exactly 18,000 devices using seed `20260807`; this is a reproducibility target, not a product capacity limit. The stress fixture contains 50,000 devices. Both catalogs combine provenance-preserving IFC elements with explicitly marked synthetic devices.
+Источник — West Riverside Hospital из IFC-Bench/OpenIFC Model Repository, лицензия CC BY 3.0.
+Checksum и attribution находятся в `data/source`. Репрезентативный fixture содержит ровно 18 000
+устройств с seed `20260807`; это цель воспроизводимости, а не предел продукта. Stress fixture
+содержит 50 000 устройств. В обоих каталогах реальные IFC-элементы сохраняют provenance, а
+синтетические устройства явно обозначены.

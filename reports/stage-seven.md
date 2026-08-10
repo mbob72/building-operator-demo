@@ -1,4 +1,4 @@
-# Stage 7 report — simulated control commands
+# Отчёт этапа 7 — simulated control commands
 
 - Дата реализации: 2026-08-10
 - Дата приёмки: 2026-08-10
@@ -9,7 +9,7 @@
 
 Stage 7 добавляет операторское управление из карточки выбранного устройства: on/off и setpoint строятся только из stable device capabilities. Потенциально критичная capability требует отдельного confirmation dialog. После submission UI показывает полный simulated lifecycle `pending → accepted → executed | failed | timedOut`. Успешная команда затем отдельным telemetry event изменяет фактическое значение, не подменяя его frontend-local desired state.
 
-## Backend
+## Серверная часть
 
 - `POST /api/v1/commands` валидирует runtime contract, device/capability, setpoint range/step и confirmation audit fields.
 - `clientRequestId` — process-local idempotency key: точный repeat возвращает текущий record без нового event, conflicting reuse даёт `409`.
@@ -21,9 +21,10 @@ Stage 7 добавляет операторское управление из к
 - On/off сходится на объявленном boolean telemetry channel, setpoint — на `setpoint`/`level` или объявленном numeric fallback. `failed`/`timedOut` actual state не меняют.
 - Process shutdown очищает command timers вместе с telemetry simulator timer.
 
-HTTP errors: schema-invalid body — `400`, unknown device/command — `404`, idempotency conflict — `409`, capability/setpoint/confirmation violation — `422`.
+Ошибки HTTP: невалидный body — `400`, неизвестное устройство/команда — `404`, конфликт
+idempotency — `409`, нарушение capability/setpoint/confirmation — `422`.
 
-## Frontend
+## Клиентская часть
 
 - `CommandControls` встроен в единственную `DeviceCard`; устройств без command capabilities он явно помечает как read-only.
 - `CommandDraft` живёт только в Zustand и очищается при смене/закрытии selection.

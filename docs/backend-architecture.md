@@ -1,7 +1,7 @@
-# Backend architecture
+# Архитектура backend
 
 - Актуально на: 2026-08-10
-- Текущий статус: объединённый Stage 8–9 завершён и принят; Stage 10 не начат
+- Текущий статус: объединённые этапы 10–11 завершены и приняты; MVP завершён
 - Назначение: живое описание реализованного backend; обновляется при каждом этапе и существенном изменении API, хранения или runtime topology.
 
 ## Роль backend
@@ -52,9 +52,9 @@ Fastify выполняет ту же роль, что Express: routes, lifecycle
 
 Высокая производительность Fastify сама по себе не является архитектурной гарантией. Для MVP важнее явные контракты, startup validation и тестируемый `buildApp()`.
 
-## Runtime topology
+## Runtime-топология
 
-Development:
+Разработка:
 
 ```text
 Browser :5173 -> Vite / HMR
@@ -63,7 +63,7 @@ Browser :5173 -> Vite / HMR
 
 Frontend использует относительные `/api/*`, поэтому штатному LAN/dev-потоку не нужен CORS.
 
-Production:
+Production-режим:
 
 ```text
 Browser -> one Fastify origin
@@ -74,13 +74,13 @@ Browser -> one Fastify origin
 
 Render запускает один Node service и проверяет `/api/health`. JSON-ответы больше 1 024 bytes сжимаются `@fastify/compress` при поддерживаемом `Accept-Encoding`.
 
-## Startup lifecycle и repositories
+## Запуск и repositories
 
 `src/server/index.ts` читает `PORT`, `HOST`, `NODE_ENV`, строит приложение и корректно закрывает его на `SIGINT/SIGTERM`. Network listener отделён от `buildApp()`, поэтому API tests работают через `app.inject()`.
 
-### Scene repository
+### Repository сцен
 
-`scene-repository.ts`:
+Обязанности `scene-repository.ts`:
 
 1. читает `west-riverside.floor-index.json`;
 2. валидирует индекс;
@@ -92,11 +92,11 @@ Render запускает один Node service и проверяет `/api/heal
 
 Все подготовленные scenes вместе занимают около 1,2 МБ. Они загружаются один раз при старте. `sceneDatasetVersion` берётся из floor index.
 
-### Device catalog repository
+### Repository каталога устройств
 
 `device-catalog.ts` синхронно читает и распаковывает `west-riverside.devices-18000.json.gz`, валидирует полный `DeviceCatalog` и хранит его в памяти. Gzip-файл около 471 КБ. `selectCatalogFloors()` создаёт floor/building scope линейной фильтрацией массива.
 
-### Realtime engine, alarms и commands
+### Realtime engine, аварии и команды
 
 `state-snapshot.ts` отдельно от catalog вычисляет initial `DeviceTelemetry` на устройство:
 
@@ -207,7 +207,7 @@ realtime engine     -> authoritative hot data + ordered replay, keyed by entity 
 
 Stage 0/3/4 routes ещё используют упрощённые `{ error, details? }`; единый `ApiError` middleware остаётся будущим улучшением. Compression применяется глобально к достаточно большим ответам, но ETag вычисляется из version/scope, а не из encoded body.
 
-## Проверки Stage 8–9
+## Проверки этапов 8–9
 
 API coverage проверяет:
 
@@ -232,7 +232,7 @@ Reliability coverage дополнительно проверяет duplicate/ove
 
 Production smoke проверяет compiled server, HTML, scene, catalog, snapshot, command creation и realtime batch.
 
-## Ограничения и следующий шаг
+## Ограничения и performance-финализация
 
 - Scenes, catalog и authoritative hot state находятся в памяти одного процесса; restart создаёт новый stream и требует resync.
 - Floor selection линейно фильтрует 18 000 records; индексы пока не нужны по измерениям этого этапа.
@@ -242,4 +242,8 @@ Production smoke проверяет compiled server, HTML, scene, catalog, snaps
 - Commands, timers и idempotency index находятся в памяти процесса; restart удаляет историю и незавершённые команды.
 - Delayed telemetry convergence — synthetic fixture, а не подтверждение physical controller или модель динамики оборудования.
 
-Stage 8–9 завершён и принят. Следующий Stage 10 — отдельный performance benchmark; он не начат.
+Для этапов 10–11 server выбирает `representative`/`stress` catalog через
+`BUILDING_DEVICE_FIXTURE`, а simulator cadence — через `REALTIME_SIMULATOR_INTERVAL_MS` и
+`REALTIME_SIMULATOR_BATCH_SIZE`. Test-only `POST /api/benchmark/realtime-burst` регистрируется
+только при `ENABLE_PERFORMANCE_ROUTES=1` и отсутствует в обычном production runtime. Полная
+performance-матрица пройдена; см. [`reports/performance.md`](../reports/performance.md).

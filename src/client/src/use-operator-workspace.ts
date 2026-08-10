@@ -19,9 +19,6 @@ export const useOperatorWorkspaceModel = (floors: FloorSummary[]) => {
   const priorityMembershipVersion = useRealtimeSelector(
     (snapshot) => snapshot.priorityMembershipVersion,
   );
-  const priorityMembershipChanged = useRealtimeSelector(
-    (snapshot) => snapshot.priorityMembershipChanged,
-  );
   const alarmsById = useRealtimeSelector((snapshot) => snapshot.alarmsById);
 
   useEffect(() => {
@@ -50,6 +47,10 @@ export const useOperatorWorkspaceModel = (floors: FloorSummary[]) => {
     state.typeFilters,
     statusFilterDependency,
   ]);
+  const visibleDeviceIds = useMemo(
+    () => new Set(filteredDevices.map((device) => device.id)),
+    [filteredDevices],
+  );
 
   const selectedDevice = useMemo(
     () => catalogDevices.find((device) => device.id === state.selectedDeviceId),
@@ -62,6 +63,7 @@ export const useOperatorWorkspaceModel = (floors: FloorSummary[]) => {
     catalogDevices,
     devices,
     filteredDevices,
+    visibleDeviceIds,
     selectedDevice,
     onSelectDevice: state.setSelectedDeviceId,
     requestError: catalogQuery.error ?? realtimeError,
@@ -70,7 +72,6 @@ export const useOperatorWorkspaceModel = (floors: FloorSummary[]) => {
     dirtyStatusDeviceIds,
     statusVersion,
     priorityMembershipVersion,
-    priorityMembershipChanged,
     alarmsById,
   };
 };

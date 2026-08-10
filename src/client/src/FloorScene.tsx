@@ -19,13 +19,14 @@ interface FloorSceneProps {
   floor: FloorSummary;
   floors: FloorSummary[];
   devices: DeviceMetadata[];
+  visibleDeviceIds: ReadonlySet<string>;
+  visibleDeviceCount: number;
   alarmDevices: DeviceMetadata[];
   alarmsById: ReadonlyMap<string, Alarm>;
   statusByDeviceId: ReadonlyMap<string, DeviceStatus>;
   dirtyStatusDeviceIds: ReadonlySet<string>;
   statusVersion: number;
   priorityMembershipVersion: number;
-  priorityMembershipChanged: boolean;
   selectedDevice: DeviceMetadata | undefined;
   onSelectDevice: (deviceId?: string) => void;
 }
@@ -34,13 +35,14 @@ export const FloorScene = ({
   floor,
   floors,
   devices,
+  visibleDeviceIds,
+  visibleDeviceCount,
   alarmDevices,
   alarmsById,
   statusByDeviceId,
   dirtyStatusDeviceIds,
   statusVersion,
   priorityMembershipVersion,
-  priorityMembershipChanged,
   selectedDevice,
   onSelectDevice,
 }: FloorSceneProps) => {
@@ -57,13 +59,13 @@ export const FloorScene = ({
     viewState: controller.viewState,
     scene: controller.scene,
     devices,
+    visibleDeviceIds,
     alarmDevices,
     alarmsById,
     statusByDeviceId,
     dirtyStatusDeviceIds,
     statusVersion,
     priorityMembershipVersion,
-    priorityMembershipChanged,
     selectedDevice,
   });
   const emptySceneMessage = sceneEmptyMessage(controller.scene);
@@ -114,7 +116,7 @@ export const FloorScene = ({
                 {controller.scene?.zoomBand ?? 'loading'} · {controller.scene?.meta.returnedFeatures ?? 0}/{controller.scene?.meta.totalFeatures ?? 0} features
               </span>
               <span>
-                {devices.length} devices · {priorityDeviceCount} priority · z {controller.viewState.zoom.toFixed(2)}{controller.loading ? ' · updating' : ''}
+                {visibleDeviceCount} devices · {priorityDeviceCount} priority · z {controller.viewState.zoom.toFixed(2)}{controller.loading ? ' · updating' : ''}
               </span>
             </>
           )}

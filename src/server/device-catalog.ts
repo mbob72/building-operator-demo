@@ -6,9 +6,14 @@ import {
   type DeviceCatalog,
 } from '../shared/domain-contracts.js';
 
+export const deviceFixture = process.env.BUILDING_DEVICE_FIXTURE === 'stress'
+  ? 'stress'
+  : 'representative';
 const catalogFile = resolve(
   process.cwd(),
-  'data/generated/west-riverside.devices-18000.json.gz',
+  deviceFixture === 'stress'
+    ? 'data/generated/west-riverside.devices-50000.json.gz'
+    : 'data/generated/west-riverside.devices-18000.json.gz',
 );
 
 export const deviceCatalog = DeviceCatalogSchema.parse(JSON.parse(

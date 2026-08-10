@@ -1,55 +1,52 @@
-# Stage 3 — minimal device vertical slice
+# Отчёт этапа 3 — минимальный вертикальный срез устройств
 
-Date: 2026-08-07. Status: ready for approval.
+Дата: 2026-08-07. Статус: принят.
 
-## Outcome
+## Результат
 
-Level 1 now renders its 2,900 stable device records over the prepared architectural scene. Devices are supplied separately from viewport-filtered plan geometry and rendered by one deck.gl `IconLayer`; there is no React or DOM node per device.
+Level 1 показывает 2 900 stable device records поверх архитектурной сцены. Устройства передаются
+отдельно от viewport-filtered plan geometry и рендерятся одним deck.gl `IconLayer`, без React/DOM
+node на устройство.
 
-## Backend
+## Серверная часть
 
-- Implemented `GET /api/v1/catalog?buildingId&floorIds` using the Stage 1 runtime contract.
-- The server loads and validates the checked-in 18,000-device gzip catalog once at process startup.
-- A floor-scoped request returns only that floor metadata and its devices; Level 1 returns exactly 2,900 records.
-- Unknown buildings/floors and invalid queries are rejected.
-- Stable responses expose `ETag`, `Cache-Control`, and support `If-None-Match` with `304`.
-- The Level 1 JSON response is 2,178,593 bytes before HTTP content encoding. It is loaded once as stable metadata, not on every viewport update.
+- Реализован `GET /api/v1/catalog?buildingId&floorIds` по runtime-контракту.
+- Gzip catalog на 18 000 загружается и валидируется один раз при startup.
+- Floor scope Level 1 возвращает ровно 2 900 records; unknown/invalid scopes отвергаются.
+- Поддержаны `ETag`, `Cache-Control`, `If-None-Match` и `304`.
+- JSON Level 1 занимал 2 178 593 bytes до HTTP encoding и загружался как stable metadata.
 
-## Renderer
+## Рендеринг
 
-- Added a same-origin SVG texture atlas with eight icon families.
-- A single instanced `IconLayer` maps all device types to atlas regions and category colors.
-- Icon size is 7 px at the fitted view, 10 px at standard zoom, and 14 px at detail zoom.
-- Floor polygons/paths and devices remain separate layers and update at different cadences.
-- Architectural layers are excluded from the pick buffer because they currently have no selection behavior.
-- Device selection uses `DeckGLRef.pickObject()` against only `floor-devices`, with a 4 px pick radius.
-- The selected device is highlighted and represented by one React card with identity, protocol, provenance, position, and capability counts.
+- Same-origin SVG atlas и один instanced `IconLayer`.
+- Device types отображались atlas regions/colors; размеры зависели от zoom.
+- Plan и devices оставались layers с разным cadence; план исключён из pick buffer.
+- Selection использовал `pickObject()` только по device layer с radius 4 px.
+- Одно выбранное устройство показывалось одной React card.
 
-> Post-stage note (2026-08-09): Stage 6 replaced the original eight-family many-to-one mapping with 19 unique glyphs, one per `DeviceTypeSchema` option. Instanced `IconLayer`, same-origin SVG atlas and GPU picking boundaries remain unchanged; see `reports/stage-six.md`.
+> После этапа 6 mapping заменён на 19 уникальных glyphs по одному на `DeviceType`; instancing,
+> same-origin atlas и GPU picking сохранились.
 
-## State boundary
+## Граница состояния
 
-Only stable `DeviceMetadata` is loaded. Telemetry, connection, warning/critical status, alarms, and commands are not added to catalog objects. Selection is a single UI state reference; no complete device array is recreated for a selection change.
+Catalog содержал только `DeviceMetadata`. Telemetry/status/alarms/commands не добавлялись в objects;
+selection не пересоздавал device array.
 
-## Verification
+## Проверка
 
-| Check | Result |
+| Проверка | Результат |
 |---|---|
-| Runtime and generated schema freshness | Passed |
-| Eight floor scenes | Passed, 3,680 features |
-| Representative/stress catalogs | Passed, 18,000 / 50,000 devices |
-| Unit/API/contract tests | 15 of 15 passed |
-| Level 1 catalog contract | Passed, 2,900 devices |
-| ETag / conditional request | Passed |
-| TypeScript strict typecheck | Passed |
-| Production build and smoke | Passed, including floor-scoped catalog |
-| Chromium E2E | Passed: layer count, zoom, GPU picking, card close |
+| Contracts/schema freshness | пройдено |
+| 8 floor scenes | 3 680 features |
+| Representative/stress catalogs | 18 000 / 50 000 |
+| Unit/API/contract | 15/15 |
+| Level 1 catalog | 2 900 устройств |
+| ETag/typecheck/build/smoke | пройдено |
+| Chromium E2E | layers, zoom, GPU picking, card close |
 
-The browser test also asserts fewer than 200 DOM elements while 2,900 devices are present, protecting against accidental per-device JSX.
+Browser test также требовал менее 200 DOM nodes при 2 900 устройствах.
 
-## Deferred
+## Отложено на тот момент
 
-- Floor switching and building overview belong to Stage 4.
-- Filters, search, status-aware LOD, and labels belong to later approved scope.
-- Hot telemetry and dirty GPU attribute updates begin in Stage 5.
-- Formal frame-time, memory, mobile, and 50,000-device benchmarks remain Stage 10 work.
+Floor/building, filters/search, hot telemetry и performance benchmark относились к следующим этапам;
+в завершённом MVP они реализованы и проверены.

@@ -25,6 +25,9 @@ interface AppOptions {
   staticRoot?: string;
   realtimeEngine?: RealtimeEngine;
   startRealtimeSimulator?: boolean;
+  realtimeSimulatorIntervalMs?: number;
+  realtimeSimulatorBatchSize?: number;
+  enablePerformanceRoutes?: boolean;
 }
 
 const zoomBand = (zoom: number) => {
@@ -43,11 +46,28 @@ export const buildApp = (options: AppOptions = {}) => {
   });
 
   if (options.startRealtimeSimulator) {
-    app.addHook('onReady', () => realtimeEngine.startSimulator());
+    app.addHook('onReady', () => realtimeEngine.startSimulator(
+      options.realtimeSimulatorIntervalMs,
+      options.realtimeSimulatorBatchSize,
+    ));
   }
   app.addHook('onClose', () => realtimeEngine.stopSimulator());
 
   app.get('/api/health', async () => ({ status: 'ok' }));
+
+  if (options.enablePerformanceRoutes) {
+    app.post('/api/benchmark/realtime-burst', async (request, reply) => {
+      const { batchSize } = (request.body ?? {}) as { batchSize?: unknown };
+      if (!Number.isInteger(batchSize) || (batchSize as number) < 1 || (batchSize as number) > 5_000) {
+        return reply.status(400).send({ error: 'invalid_benchmark_batch_size' });
+      }
+      const batch = realtimeEngine.generateSimulatorBatch(batchSize as number);
+      return {
+        acceptedEvents: batch?.events.length ?? 0,
+        latestSequence: realtimeEngine.latestSequence,
+      };
+    });
+  }
 
   app.get('/api/floors', async () => ({ floors }));
 

@@ -21,7 +21,7 @@ export const App = () => {
     <main className="app-shell">
       <header className="topbar">
         <div>
-          <p className="eyebrow">OPERATOR DEMO / STAGE 8–9</p>
+          <p className="eyebrow">OPERATOR DEMO / STAGE 10–11</p>
           <h1>{title}</h1>
         </div>
         <div className="topbar__meta">

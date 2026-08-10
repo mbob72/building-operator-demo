@@ -1,94 +1,74 @@
-# Sequential task board
+# Последовательная доска задач
 
-## Stage 0 — viewport scene prototype
+## Этап 0 — прототип viewport-сцены
 
-- [x] Define scope and acceptance criteria.
-- [x] Define runtime and JSON contracts.
-- [x] Implement floor and scene endpoints.
-- [x] Implement bbox and zoom filtering.
-- [x] Implement orthographic floor viewer.
-- [x] Implement pan, zoom, fit, and diagnostics.
-- [x] Install dependencies and run verification.
-- [x] Run browser smoke test.
-- [x] Capture large-object rendering and realtime-update guardrails.
-- [x] Prepare GitHub Actions and Render live-demo configuration.
-- [x] Create the approved public GitHub repository.
-- [x] Create and verify the Render service from the committed Blueprint.
-- [x] Present Stage 0 for approval.
+- [x] Зафиксировать scope, acceptance, runtime/JSON contracts.
+- [x] Реализовать floor/scene API, bbox/zoom filtering и ортографический viewer.
+- [x] Реализовать pan/zoom/fit/diagnostics и browser smoke.
+- [x] Зафиксировать rendering/realtime guardrails.
+- [x] Подготовить GitHub Actions, repository и Render deployment.
+- [x] Пройти verification и получить приёмку.
 
-## Stage 1 — product model and domain contracts
+## Этап 1 — продукт и доменные контракты
 
-- [x] Confirm operator workflows and MVP boundaries.
-- [x] Define building, floor, device, telemetry, alarm, and command entities.
-- [x] Separate stable metadata, hot operational state, UI state, and renderer state.
-- [x] Define REST catalog, snapshot, acknowledge, and command payloads.
-- [x] Define ordered realtime batches, resume, heartbeat, and resync fallback.
-- [x] Generate backend-independent JSON Schema from runtime contracts.
-- [x] Add contract and lifecycle tests.
-- [x] Record state-separation and realtime-recovery ADRs.
-- [x] Run full Stage 1 verification.
-- [x] Present Stage 1 for approval.
+- [x] Описать workflows и границы MVP.
+- [x] Определить domain, REST и ordered realtime contracts.
+- [x] Разделить stable/hot/UI/renderer state.
+- [x] Генерировать backend-independent JSON Schema.
+- [x] Добавить contract/lifecycle tests и ADR.
+- [x] Пройти verification и получить приёмку.
 
-## Stage 2 — offline data pipeline
+## Этап 2 — offline data pipeline
 
-- [x] Approve a representative 18,000-device fixture and 50,000-device stress target.
-- [x] Download and SHA-256 verify selected IFC2X3 MEP disciplines.
-- [x] Audit storeys, classes, placements, and coordinate alignment.
-- [x] Extract all architectural floors and LOD metadata.
-- [x] Preserve IFC provenance and normalize real device coordinates by floor.
-- [x] Generate missing categories deterministically with a fixed seed.
-- [x] Validate the catalog against runtime contracts and data-quality invariants.
-- [x] Produce the 50,000-device stress fixture.
-- [x] Write the data-quality report and reproducibility instructions.
-- [x] Run full Stage 2 verification.
-- [x] Present Stage 2 for approval.
+- [x] Утвердить 18 000 representative и 50 000 stress devices.
+- [x] Скачать и SHA-256 проверить IFC2X3 MEP sources.
+- [x] Проверить storeys/classes/placements/coordinates.
+- [x] Извлечь восемь floors и LOD metadata.
+- [x] Сохранить IFC provenance и нормализовать coordinates.
+- [x] Deterministic generation недостающих категорий с fixed seed.
+- [x] Проверить contracts/data quality/reproducibility.
+- [x] Подготовить отчёт, пройти verification и приёмку.
 
-## Stage 3 — minimal device vertical slice
+## Этап 3 — минимальный device slice
 
-- [x] Load stable device metadata for one floor through the API.
-- [x] Render one floor's devices with deck.gl `IconLayer` and a texture atlas.
-- [x] Use GPU picking without per-device React/DOM components.
-- [x] Open a card for the selected device.
-- [x] Add API, UI, and browser tests for the vertical slice.
-- [x] Run full Stage 3 verification.
-- [x] Present Stage 3 for approval.
-- [x] Receive explicit Stage 3 approval.
+- [x] Загрузить stable metadata одного этажа.
+- [x] Отрисовать devices через deck.gl `IconLayer`/atlas/GPU picking без per-device DOM.
+- [x] Открывать карточку выбранного устройства.
+- [x] Добавить API/UI/browser tests, пройти verification и приёмку.
 
-## Stage 4 — floor mode and building overview
+## Этап 4 — floor mode и building overview
 
-- [x] Serve all eight prepared floors through floor and scene APIs.
-- [x] Add floor switching while preserving independent scene/device data flows.
-- [x] Add a side-by-side building overview with all floors and 18,000 devices.
-- [x] Preserve pan, zoom, fit, and GPU picking in floor and overview modes.
-- [x] Add plan, device-icon, and label LOD behavior.
-- [x] Add search and filters by device type and protocol.
-- [x] Add the approved Stage 4 status source and status filtering.
-- [x] Keep warning/critical devices visible at every LOD.
-- [x] Add API, UI, and browser coverage for floor/overview workflows.
-- [x] Update frontend/backend architecture and Stage 4 report.
-- [x] Run full Stage 4 verification.
-- [x] Present Stage 4 for approval.
-- [ ] Receive explicit Stage 4 approval.
+- [x] Выдать восемь floor scenes и добавить переключение.
+- [x] Показать side-by-side overview с 18 000 devices.
+- [x] Сохранить pan/zoom/fit/GPU picking и LOD.
+- [x] Добавить search/type/protocol/status filters.
+- [x] Сохранять warning/critical на всех LOD.
+- [x] Добавить coverage, обновить architecture/report, пройти verification и приёмку.
 
-## Stages 5–7
+## Этапы 5–7
 
-- [x] Complete and receive explicit approval for ordered realtime state (Stage 5).
-- [x] Complete and receive explicit approval for alarms (Stage 6).
-- [x] Complete and receive explicit approval for simulated commands (Stage 7).
+- [x] Ordered realtime state и explicit approval (этап 5).
+- [x] Alarms и explicit approval (этап 6).
+- [x] Simulated commands и explicit approval (этап 7).
 
-## Combined Stage 8–9 — reliability and full-product automated acceptance
+## Объединённые этапы 8–9 — надёжность и полный automated acceptance
 
-- [x] Receive explicit user approval to start combined Stage 8–9.
-- [x] Define disconnect command safety and idempotent retry policy.
-- [x] Harden duplicate, stale, gap, stream-change, and reconnect recovery.
-- [x] Handle unknown devices and nullable `roomId` without corrupting UI state.
-- [x] Preserve selection and operator state during alarm bursts.
-- [x] Add command lookup fallback while realtime is unavailable.
-- [x] Complete unit, contract, API, component, E2E, and DOM-cardinality coverage.
-- [x] Update frontend/backend architecture and Stage 8–9 report.
-- [x] Run full verification and browser acceptance.
-- [x] Present combined Stage 8–9 and receive explicit approval.
+- [x] Получить разрешение и определить disconnect command safety/idempotent retry.
+- [x] Защитить duplicate/stale/gap/stream-change/reconnect recovery.
+- [x] Обработать unknown devices и nullable `roomId`.
+- [x] Сохранять selection/UI state при alarm burst.
+- [x] Добавить command lookup fallback без realtime.
+- [x] Закрыть unit/contract/API/component/E2E/DOM coverage.
+- [x] Обновить architecture/report, пройти verification и получить приёмку.
 
-## Later stages
+## Объединённые этапы 10–11 — производительность и финализация MVP
 
-Stage 10 performance work remains blocked until explicit approval after Stage 8–9.
+- [x] Получить явное разрешение на объединённый этап.
+- [x] Зафиксировать benchmark boundary и язык документации.
+- [x] Добавить browser benchmark для 18 000 и 50 000 устройств.
+- [x] Измерить floor/building, burst, memory, long tasks, React commits и latency.
+- [x] Реализовать подтверждённые измерениями оптимизации и before/after evidence.
+- [x] Перевести человекочитаемый Markdown репозитория на русский.
+- [x] Завершить architecture/deployment/source/license/limitations/risk review.
+- [x] Выполнить `verify`, browser acceptance и performance acceptance.
+- [x] Представить завершённый MVP и получить явную финальную приёмку.

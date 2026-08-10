@@ -25,13 +25,13 @@ interface UseFloorSceneLayersOptions {
   viewState: SceneViewState;
   scene: SceneResponse | undefined;
   devices: DeviceMetadata[];
+  visibleDeviceIds: ReadonlySet<string>;
   alarmDevices: DeviceMetadata[];
   alarmsById: ReadonlyMap<string, Alarm>;
   statusByDeviceId: ReadonlyMap<string, DeviceStatus>;
   dirtyStatusDeviceIds: ReadonlySet<string>;
   statusVersion: number;
   priorityMembershipVersion: number;
-  priorityMembershipChanged: boolean;
   selectedDevice: DeviceMetadata | undefined;
 }
 
@@ -41,13 +41,13 @@ export const useFloorSceneLayers = ({
   viewState,
   scene,
   devices,
+  visibleDeviceIds,
   alarmDevices,
   alarmsById,
   statusByDeviceId,
   dirtyStatusDeviceIds,
   statusVersion,
   priorityMembershipVersion,
-  priorityMembershipChanged,
   selectedDevice,
 }: UseFloorSceneLayersOptions) => {
   const deviceGroups = useMemo(
@@ -63,25 +63,13 @@ export const useFloorSceneLayers = ({
     [alarmByDeviceId, alarmDevices],
   );
 
-  const normalLayerData = useMemo(
-    () => [...deviceGroups.normal],
-    [deviceGroups.normal, statusVersion],
+  const deviceLayerData = useMemo(
+    () => [...devices],
+    [devices, statusVersion],
   );
-  const priorityLayerData = useMemo(
-    () => [...deviceGroups.priority],
-    [deviceGroups.priority, statusVersion],
-  );
-  const normalDataDiff = useMemo(
-    () => priorityMembershipChanged
-      ? undefined
-      : deviceDataRanges(normalLayerData, (device) => device, dirtyStatusDeviceIds),
-    [dirtyStatusDeviceIds, normalLayerData, priorityMembershipChanged],
-  );
-  const priorityDataDiff = useMemo(
-    () => priorityMembershipChanged
-      ? undefined
-      : deviceDataRanges(priorityLayerData, (device) => device, dirtyStatusDeviceIds),
-    [dirtyStatusDeviceIds, priorityLayerData, priorityMembershipChanged],
+  const deviceDataDiff = useMemo(
+    () => deviceDataRanges(deviceLayerData, (device) => device, dirtyStatusDeviceIds),
+    [deviceLayerData, dirtyStatusDeviceIds],
   );
 
   const layers = useMemo(() => {
@@ -105,6 +93,7 @@ export const useFloorSceneLayers = ({
       selectedDeviceId: selectedDevice?.id,
       zoom: viewState.zoom,
       sizeMinPixels: 5,
+      visibleDeviceIds,
     };
 
     return [
@@ -148,14 +137,8 @@ export const useFloorSceneLayers = ({
       createDeviceIconLayer({
         ...deviceLayerOptions,
         id: FLOOR_DEVICE_LAYER_IDS[0],
-        data: normalLayerData,
-        dataDiff: normalDataDiff,
-      }),
-      createDeviceIconLayer({
-        ...deviceLayerOptions,
-        id: FLOOR_DEVICE_LAYER_IDS[1],
-        data: priorityLayerData,
-        dataDiff: priorityDataDiff,
+        data: deviceLayerData,
+        dataDiff: deviceDataDiff,
       }),
       createAlarmIndicatorLayer({
         id: 'floor-alarm-indicators',
@@ -169,15 +152,18 @@ export const useFloorSceneLayers = ({
     alarmByDeviceId,
     alarmLayerData,
     floorId,
-    normalDataDiff,
-    normalLayerData,
-    priorityDataDiff,
-    priorityLayerData,
+    deviceDataDiff,
+    deviceLayerData,
     scene,
     selectedDevice?.id,
     statusByDeviceId,
     viewState.zoom,
+    visibleDeviceIds,
   ]);
 
-  return { layers, priorityDeviceCount: deviceGroups.priority.length };
+  const priorityDeviceCount = deviceGroups.priority.reduce(
+    (count, device) => count + (visibleDeviceIds.has(device.id) ? 1 : 0),
+    0,
+  );
+  return { layers, priorityDeviceCount };
 };

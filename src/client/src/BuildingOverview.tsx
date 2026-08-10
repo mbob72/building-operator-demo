@@ -29,13 +29,14 @@ import { useElementSize } from './use-element-size';
 interface BuildingOverviewProps {
   floors: FloorSummary[];
   devices: DeviceMetadata[];
+  visibleDeviceIds: ReadonlySet<string>;
+  visibleDeviceCount: number;
   alarmDevices: DeviceMetadata[];
   alarmsById: ReadonlyMap<string, Alarm>;
   statusByDeviceId: ReadonlyMap<string, DeviceStatus>;
   dirtyStatusDeviceIds: ReadonlySet<string>;
   statusVersion: number;
   priorityMembershipVersion: number;
-  priorityMembershipChanged: boolean;
   selectedDevice: DeviceMetadata | undefined;
   onSelectDevice: (deviceId?: string) => void;
 }
@@ -89,13 +90,14 @@ const buildLayout = (floors: FloorSummary[], columns: number) => {
 export const BuildingOverview = ({
   floors,
   devices,
+  visibleDeviceIds,
+  visibleDeviceCount,
   alarmDevices,
   alarmsById,
   statusByDeviceId,
   dirtyStatusDeviceIds,
   statusVersion,
   priorityMembershipVersion,
-  priorityMembershipChanged,
   selectedDevice,
   onSelectDevice,
 }: BuildingOverviewProps) => {
@@ -173,25 +175,20 @@ export const BuildingOverview = ({
     () => partitionDeviceItems(offsetDevices, (item) => item.device, statusByDeviceId),
     [offsetDevices, priorityMembershipVersion],
   );
-  const normalLayerData = useMemo(
-    () => [...deviceGroups.normal],
-    [deviceGroups.normal, statusVersion],
+  const deviceLayerData = useMemo(
+    () => [...offsetDevices],
+    [offsetDevices, statusVersion],
   );
-  const priorityLayerData = useMemo(
-    () => [...deviceGroups.priority],
-    [deviceGroups.priority, statusVersion],
+  const deviceDataDiff = useMemo(
+    () => deviceDataRanges(deviceLayerData, (item) => item.device, dirtyStatusDeviceIds),
+    [deviceLayerData, dirtyStatusDeviceIds],
   );
-  const normalDataDiff = useMemo(
-    () => priorityMembershipChanged
-      ? undefined
-      : deviceDataRanges(normalLayerData, (item) => item.device, dirtyStatusDeviceIds),
-    [dirtyStatusDeviceIds, normalLayerData, priorityMembershipChanged],
-  );
-  const priorityDataDiff = useMemo(
-    () => priorityMembershipChanged
-      ? undefined
-      : deviceDataRanges(priorityLayerData, (item) => item.device, dirtyStatusDeviceIds),
-    [dirtyStatusDeviceIds, priorityLayerData, priorityMembershipChanged],
+  const visiblePriorityDeviceCount = useMemo(
+    () => deviceGroups.priority.reduce(
+      (count, item) => count + (visibleDeviceIds.has(item.device.id) ? 1 : 0),
+      0,
+    ),
+    [deviceGroups.priority, visibleDeviceIds],
   );
 
   const selectedOffsetDevice = useMemo(() => {
@@ -212,6 +209,7 @@ export const BuildingOverview = ({
       selectedDeviceId: selectedDevice?.id,
       zoom: viewState.zoom,
       sizeMinPixels: 4,
+      visibleDeviceIds,
     };
 
     return [
@@ -272,14 +270,8 @@ export const BuildingOverview = ({
       createDeviceIconLayer({
         ...deviceLayerOptions,
         id: 'overview-devices',
-        data: normalLayerData,
-        dataDiff: normalDataDiff,
-      }),
-      createDeviceIconLayer({
-        ...deviceLayerOptions,
-        id: 'overview-priority-devices',
-        data: priorityLayerData,
-        dataDiff: priorityDataDiff,
+        data: deviceLayerData,
+        dataDiff: deviceDataDiff,
       }),
       createAlarmIndicatorLayer({
         id: 'overview-alarm-indicators',
@@ -292,16 +284,15 @@ export const BuildingOverview = ({
   }, [
     alarmByDeviceId,
     layout.items,
-    normalDataDiff,
-    normalLayerData,
+    deviceDataDiff,
+    deviceLayerData,
     offsetAlarmDevices,
-    priorityDataDiff,
-    priorityLayerData,
     sceneData,
     selectedOffsetDevice,
     selectedDevice?.id,
     statusByDeviceId,
     viewState.zoom,
+    visibleDeviceIds,
   ]);
 
   const resetView = () => {
@@ -379,7 +370,7 @@ export const BuildingOverview = ({
                 {band} · {loadedScenes}/{floors.length} floors{emptyScenes ? ` · ${emptyScenes} empty` : ''}
               </span>
               <span>
-                {devices.length} devices · {deviceGroups.priority.length} priority · z {viewState.zoom.toFixed(2)}{sceneQueries.some((query) => query.isFetching) ? ' · updating' : ''}
+                {visibleDeviceCount} devices · {visiblePriorityDeviceCount} priority · z {viewState.zoom.toFixed(2)}{sceneQueries.some((query) => query.isFetching) ? ' · updating' : ''}
               </span>
             </>
           )}

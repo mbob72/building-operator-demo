@@ -1,101 +1,119 @@
-# Assumptions
+# Допущения
 
-## A-001 Device dataset size
+## A-001 Размер набора устройств
 
-The representative fixture contains exactly 18,000 devices after explicit Stage 2 approval. This is a reproducibility target, not a production capacity limit. A separate 50,000-device fixture remains the stress-test target; toy-scale (~2,000) and excessive (~200,000) fixtures are not representative acceptance datasets.
+Репрезентативный fixture содержит ровно 18 000 устройств. Это цель воспроизводимости, а не
+production capacity limit. Отдельный stress fixture содержит 50 000; ~2 000 и ~200 000 не являются
+приёмочными наборами. Распределение 18 000: 7 000 DALI lights; 3 200 KNX presence/temperature/CO₂;
+1 400 KNX switches/actuators; 2 600 fire/sprinkler/security; 2 200 HVAC/Modbus; 800 meters/electrical
+controllers; 800 access/other.
 
-Approved representative distribution:
+## A-002 Геометрия этажа этапа 0
 
-- 7,000 DALI lighting devices;
-- 3,200 KNX presence, temperature, and CO₂ sensors;
-- 1,400 KNX switches and actuators;
-- 2,600 fire, sprinkler, and security devices;
-- 2,200 HVAC/Modbus devices;
-- 800 meters and electrical controllers;
-- 800 access and other devices.
+Используется реальное горизонтальное сечение архитектурного IFC2X3 West Riverside Hospital на
+1,2 м выше Level 1: стены, колонны, двери, окна/витражи и лестницы. Из-за отсутствия полезных
+`IfcSpace` помещения не именуются и не выводятся.
 
-## A-002 Stage 0 floor geometry
+## A-003 Система координат
 
-Stage 0 uses a real horizontal section of the West Riverside Hospital architectural IFC2x3 model. The section plane is 1.2 metres above Level 1 and includes walls, columns, doors, windows/curtain walls, and stairs. Because the model has no useful `IfcSpace` collection, rooms are not named or inferred.
+Cartesian metres, положительная Y направлена вверх. IFC world coordinates нормализуются offline
+относительно локального origin этажа.
 
-## A-003 Scene coordinate system
+## A-004 Доставка сцены
 
-Scene coordinates are Cartesian metres with the positive Y axis pointing upward. The IFC world coordinates are normalized to a local Level 1 origin during offline extraction.
+JSON viewport query — заменяемая граница. Vector tiles/cached spatial chunks выбираются только
+после измерений реальной геометрии.
 
-## A-004 Scene delivery protocol
+## A-005 Backend
 
-Stage 0 uses a JSON viewport query. This is a replaceable boundary. Vector tiles, cached spatial chunks, or another protocol can be selected after measuring real extracted geometry.
+Prototype использует Node.js, TypeScript и Fastify ради общих контрактов с frontend; production
+technology этим не определяется.
 
-## A-005 Backend implementation
+## A-006 Доставка каталога
 
-The prototype backend uses Node.js, TypeScript, and Fastify to share contracts with the frontend. This does not define the production backend technology.
+Stable catalog передаётся одним versioned document для здания/этажей. Pagination или binary encoding
+добавляются только при измеренной необходимости.
 
-## A-006 Catalog delivery
+## A-007 Identity исполнителя
 
-The MVP initially transfers the stable catalog as one versioned document for the selected building or floors. Tens-of-thousands-scale metadata is expected to be cacheable and compressible. Pagination or binary encoding is added only if data-stage measurements justify it.
+Production authentication/authorization вне scope. `requestedBy`, `acknowledgedBy`, `confirmedBy`
+содержат mock actor IDs и не являются доверенными identity claims.
 
-## A-007 Actor identity
+## A-008 Порядок realtime
 
-Production authentication and authorization are out of scope. `requestedBy`, `acknowledgedBy`, and `confirmedBy` contain explicit mock actor IDs and must not be treated as trusted identity claims.
+Sequence монотонен внутри building stream. Новый `streamId` делает старый cursor недействительным и
+требует authoritative snapshot.
 
-## A-008 Realtime ordering
+## A-009 Авторитетность snapshot
 
-Realtime sequence numbers are monotonically increasing within one building stream. A changed `streamId` means the previous cursor cannot be assumed valid and requires an authoritative snapshot.
+HTTP snapshot авторитетен для telemetry, alarms, commands и cursor и заменяет их атомарно. Stable
+catalog metadata и plan geometry в него не входят.
 
-## A-009 Snapshot authority
+## A-010 Выполнение команд
 
-The HTTP hot-state snapshot is authoritative for telemetry, alarms, commands, and the realtime cursor. It atomically replaces those stores; it does not repeat stable catalog metadata or plan geometry.
+Все команды симулированы. Backend state и actual telemetry разделены; `executed` не доказывает, что
+значение уже наблюдается. Успешная команда через 650 мс публикует отдельный synthetic telemetry patch.
+In-process timers и deterministic outcomes (большинство executed, каждое 9-е failed, 10-е timedOut)
+созданы для UI/lifecycle, а не для физической модели, durable queue или safety controller. Server
+валидирует capabilities, range/step и confirmation; browser identity/timestamp остаются недоверенными.
 
-## A-010 Command execution
+## A-011 Безопасность binding
 
-All MVP commands are simulated. Backend command state and actual telemetry are separate, and an `executed` command does not by itself prove that the requested value is already observed. Stage 7 emits a later synthetic telemetry patch for successful commands so the demo converges visibly; only that patch changes actual state.
+Binding — opaque simulator/adapter reference с provenance, без credentials. Synthetic references
+никогда не выдаются за IFC addresses.
 
-Stage 7 uses short in-process timers and a deterministic demo outcome distribution: most commands execute, while every ninth and tenth completion fail or time out. Successful completion schedules a separate telemetry confirmation after 650 ms, mapping on/off to the declared boolean channel and setpoint to `setpoint`/`level` (or the declared numeric fallback). Timers, command records, idempotency keys and audit fields are ephemeral and reset with the process. This is a UI/lifecycle fixture, not a physical model, durable queue or safety controller.
+## A-012 Timestamps и nullable fields
 
-The server validates device capabilities, setpoint range/step and required confirmation. The browser-provided `demo-operator` identity and timestamps remain untrusted mock audit data per A-007.
+Wire timestamps — ISO 8601 с UTC offset. Не наступившие lifecycle fields явно равны `null`.
 
-## A-011 Binding safety
+## A-013 Схема MEP-источников
 
-A device binding is an opaque adapter or simulator reference with explicit provenance. It contains no credentials. Synthetic references remain marked `synthetic` and are never presented as addresses extracted from IFC.
+Для Electrical, Fire Alarm, Mechanical и Sprinklers используется IFC2X3, поскольку при IFC4
+conversion потеряны полезные property sets. Каждый source проверяется SHA-256.
 
-## A-012 Wire timestamps and nullable fields
+## A-014 Provenance устройств
 
-Wire timestamps use ISO 8601 strings with an explicit UTC offset. Lifecycle audit fields use explicit `null` before they occur, producing stable object shapes for snapshots and upserts.
+IFC devices сохраняют source file, IFC class/entity ID и GlobalId. Operational binding остаётся
+simulated/synthetic. Недостающие категории генерируются с fixed seed и не выдаются за IFC-derived.
 
-## A-013 MEP source schema
+## A-015 Упрощённая базовая геометрия
 
-Stage 2 uses IFC2X3 for Electrical, Fire Alarm, Mechanical, and Sprinklers. The dataset model card reports that several useful MEP property sets were lost in the IFC4 conversion. Every downloaded source is SHA-256 verified.
-
-## A-014 Device provenance
-
-IFC-origin devices retain source file, IFC class, numeric entity ID, and GlobalId. Their operational binding remains explicitly simulated and synthetic. Missing categories are generated with a fixed seed and never presented as IFC-derived protocol addresses.
-
-## A-015 Simplified base floor geometry
-
-The convex hull of all prepared architectural feature coordinates is an intentionally simplified base footprint, not an exact room, façade, or navigable-area boundary. It exists to preserve floor context across the supported LOD range and is replaceable by a higher-fidelity footprint without changing the scene API, provided one full-range `floor-shell` continues to cover every prepared feature bbox.
+Convex hull подготовленных coordinates — упрощённый footprint, не точная room/façade/navigation
+boundary. Он заменяем без изменения API, пока один full-range `floor-shell` покрывает все feature bbox.
 
 ## A-016 Building-scoped realtime cursor
 
-Stage 5 uses one monotonically increasing stream and replay cursor for the whole building. The frontend therefore bootstraps the complete building hot snapshot; Stage 6 also keeps the stable catalog building-scoped for alarm navigation. The server sends complete building batches rather than removing events for unselected floors, because filtering a globally sequenced batch would create false gaps. A future per-floor sharding design must introduce independent stream IDs/cursors instead of reusing this global sequence.
+Один stream/cursor обслуживает здание, поэтому frontend загружает полный hot snapshot. Фильтрация
+глобально sequenced batches по этажу создала бы ложные gaps. Будущий per-floor sharding обязан иметь
+независимые stream IDs/cursors.
 
-## A-017 Stage 6 alarm fixture
+## A-017 Alarm fixture
 
-Stage 6 seeds four deterministic simulated alarms per floor so every lifecycle state and both warning/critical severities are visible without a physical alarm source. These records demonstrate UI and lifecycle behavior only; telemetry status does not automatically create or resolve an alarm. Production detection rules, persistence, durable audit history and trusted operator identity remain out of scope.
+По четыре deterministic simulated alarms на этаж демонстрируют lifecycle/severity без физического
+источника. Telemetry status не создаёт и не закрывает alarm автоматически. Detection rules,
+persistence, durable audit и trusted identity вне scope. Server валидирует transition и публикует
+принятый record через ordered stream.
 
-The frontend sends the explicit mock actor ID `demo-operator` and a browser UTC timestamp for acknowledgement. Per A-007 this is not a trusted identity claim. The server owns lifecycle validation and emits the accepted record through the ordered realtime stream.
+## A-018 Building catalog для alarm navigation
 
-## A-018 Building catalog for alarm navigation
+Полный stable catalog хранится в browser, выбранный floor выводится локально. Это увеличивает cache
+document, но исключает request races при переходе из building-wide alarms. Измерения этапов 10–11
+не потребовали pagination/floor indexes/on-demand metadata.
 
-Stage 6 keeps the 18,000-device stable catalog building-scoped in the browser and derives the selected floor locally. This intentionally trades a larger cache document for immediate navigation from a building-wide alarm list without request races. Pagination, floor indexes or on-demand metadata can replace this after Stage 10 measurements without changing alarm/device IDs.
+## A-019 Commands при недоступном realtime
 
-## A-019 Commands while realtime is unavailable
+REST и WebSocket независимы: при доступном HTTP команда может быть отправлена во время reconnect.
+После успешного POST frontend polls lookup до terminal state или восстановления realtime. При network
+failure результат POST неизвестен; draft сохраняет `clientRequestId`, а явный retry использует тот же
+idempotency key. Автоматической очереди/повторной отправки нет — это safety property.
 
-The command REST API and the ordered WebSocket are independent transport paths. A command may
-therefore be submitted while realtime is reconnecting if HTTP remains available. After a successful
-POST, the frontend polls the command lookup endpoint until a terminal state is observed or realtime
-becomes live again.
+## A-020 Язык документации
 
-If POST fails at the network boundary, the browser cannot know whether the server accepted it. The
-draft retains one stable `clientRequestId` and offers an explicit retry with that same idempotency
-key. The frontend never queues or automatically resubmits the command after reconnect. This is a
-safety property, not an offline command queue.
+С этапов 10–11 основной язык человекочитаемого Markdown — русский. API/type/file/CLI identifiers и
+code blocks не переводятся. `AGENTS.md` сохраняет нормативный смысл независимо от языка.
+
+## A-021 Среда performance benchmark
+
+На macOS benchmark явно использует ANGLE Metal. SwiftShader и trace screenshots искажают WebGL
+frame-time и не являются target evidence. Mobile project — эмуляция Pixel 7 на host GPU, не физический
+Android benchmark; это ограничение отражено в `reports/performance.md`.

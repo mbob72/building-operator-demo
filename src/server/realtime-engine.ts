@@ -417,8 +417,8 @@ export class RealtimeEngine {
   }
 
   startSimulator(
-    intervalMs = REALTIME_SIMULATOR_INTERVAL_MS,
-    batchSize = REALTIME_SIMULATOR_BATCH_SIZE,
+    intervalMs: number = REALTIME_SIMULATOR_INTERVAL_MS,
+    batchSize: number = REALTIME_SIMULATOR_BATCH_SIZE,
   ) {
     if (this.simulatorTimer) return;
     this.simulatorTimer = setInterval(() => this.generateSimulatorBatch(batchSize), intervalMs);

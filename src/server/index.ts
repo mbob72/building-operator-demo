@@ -3,7 +3,15 @@ import { buildApp } from './app.js';
 const port = Number(process.env.PORT ?? 3001);
 const isProduction = process.env.NODE_ENV === 'production';
 const host = process.env.HOST ?? (isProduction ? '0.0.0.0' : '127.0.0.1');
-const app = buildApp({ serveStatic: isProduction, startRealtimeSimulator: true });
+const realtimeSimulatorIntervalMs = Number(process.env.REALTIME_SIMULATOR_INTERVAL_MS ?? 250);
+const realtimeSimulatorBatchSize = Number(process.env.REALTIME_SIMULATOR_BATCH_SIZE ?? 24);
+const app = buildApp({
+  serveStatic: isProduction,
+  startRealtimeSimulator: true,
+  realtimeSimulatorIntervalMs,
+  realtimeSimulatorBatchSize,
+  enablePerformanceRoutes: process.env.ENABLE_PERFORMANCE_ROUTES === '1',
+});
 
 const close = async () => {
   await app.close();

@@ -27,11 +27,15 @@
     "typecheck": "tsc -p tsconfig.server.json --noEmit && tsc -p tsconfig.web.json --noEmit",
     "test": "vitest run",
     "test:e2e": "playwright test",
+    "test:performance:representative": "BUILDING_DEVICE_FIXTURE=representative playwright test --config playwright.performance.config.ts",
+    "test:performance:stress": "BUILDING_DEVICE_FIXTURE=stress playwright test --config playwright.performance.config.ts",
+    "test:performance": "npm run test:performance:representative && npm run test:performance:stress",
     "test:production": "scripts/smoke-production",
     "verify": "npm run contracts:check && npm run data:validate && npm run test && npm run build && npm run test:production"
   },
   "dependencies": {
     "@deck.gl/core": "^9.1.14",
+    "@deck.gl/extensions": "^9.3.9",
     "@deck.gl/layers": "^9.1.14",
     "@deck.gl/react": "^9.1.14",
     "@fastify/compress": "^9.2.0",

@@ -1,4 +1,4 @@
-# Stage 5 report — realtime transport and hot telemetry store
+# Отчёт этапа 5 — realtime transport и hot telemetry store
 
 Дата: 2026-08-09  
 Статус: принят пользователем 2026-08-09
@@ -9,7 +9,7 @@
 
 Stable catalog, hot operational state, Zustand UI state и deck.gl renderer state остаются раздельными. Telemetry одного устройства не меняет metadata и не заставляет React рендерить все устройства.
 
-## Backend
+## Серверная часть
 
 - Добавлен `RealtimeEngine` с индексированным authoritative state, process-scoped `streamId` и building-scoped monotonic sequence.
 - Snapshot отражает текущий engine cursor, имеет `Cache-Control: no-store` и scope-dependent ID/ETag.
@@ -20,7 +20,7 @@ Stable catalog, hot operational state, Zustand UI state и deck.gl renderer stat
 - Runtime запускает simulator через Fastify lifecycle; tests могут inject-ить engine без nondeterministic timer.
 - Vite dev proxy и production Fastify origin поддерживают WebSocket upgrade.
 
-## Frontend
+## Клиентская часть
 
 - `useRealtimeBootstrap` делает прямой abortable HTTP snapshot request без TanStack Query cache, атомарно заполняет hot store и только затем запускает WebSocket.
 - `RealtimeClient` resume-ится от bootstrap cursor, применяет ordered batches и переподключается с backoff 250–5 000 мс.
@@ -35,7 +35,7 @@ Stable catalog, hot operational state, Zustand UI state и deck.gl renderer stat
 - Переход устройства между normal/offline и warning/critical меняет priority membership и безопасно полностью перегруппировывает два `IconLayer`.
 - Status filter пересчитывает visible catalog на status update только когда этот filter активен.
 
-## Ordering и recovery invariants
+## Инварианты порядка и восстановления
 
 1. `streamId` определяет область валидности sequence.
 2. Batch применяется только если первый новый event продолжает локальный cursor без gap.

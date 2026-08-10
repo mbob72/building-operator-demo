@@ -1,28 +1,28 @@
-# ADR-0004: Separate stable metadata, hot operational state, and UI state
+# ADR-0004: Разделение stable metadata, hot operational state и UI state
 
-- Status: accepted
-- Date: 2026-08-07
+- Статус: принят
+- Дата: 2026-08-07
 
-## Context
+## Контекст
 
-The application will render a tens-of-thousands-scale device catalog while processing hundreds to thousands of updates per second. A convenient array of combined device objects would force unchanged names, positions, bindings, and capabilities to be recreated whenever status or a telemetry value changes. It would also couple React rendering to the WebGL update cadence.
+Каталог содержит десятки тысяч устройств и принимает сотни/тысячи updates в секунду. Общий массив
+device objects пересоздавал бы неизменные names, positions, bindings и capabilities при каждом
+изменении telemetry и связывал React с cadence WebGL.
 
-## Decision
+## Решение
 
-Use separate canonical state classes:
+1. Stable catalog — versioned server document с query key и `catalogVersion`.
+2. Telemetry, alarms, commands и cursor — indexed hot stores, атомарно заменяемые snapshot.
+3. Selection, filters, viewport, panels и command drafts — UI-only state.
+4. WebGL adapter соединяет стабильный порядок устройств с hot visual attributes и dirty indices.
+5. Transport использует arrays; frontend ingestion строит maps/indexes.
 
-1. Stable catalog metadata is a versioned server document cached by query key and `catalogVersion`.
-2. Telemetry, alarms, commands, and stream cursor are kept in indexed hot stores and replaced atomically by a state snapshot.
-3. Selection, filters, viewport, panels, and command drafts are UI-only state.
-4. The WebGL adapter joins stable device order with hot visual attributes and updates dirty indices at a controlled cadence.
-5. Transport payloads use arrays; frontend ingestion creates maps/indexes rather than requiring backend-specific dictionary shapes.
+Dynamic `status` относится к `DeviceTelemetry`, а не `DeviceMetadata`; `draft` относится к UI, а не
+к backend command record.
 
-Dynamic `status` is part of `DeviceTelemetry`, not `DeviceMetadata`. `draft` is part of UI state, not a backend command record.
+## Последствия
 
-## Consequences
-
-- A device telemetry change does not invalidate the catalog or recreate all device objects.
-- React panels can subscribe to narrow selectors while deck.gl receives independent batched updates.
-- Snapshot/resync can replace hot state without redownloading plan geometry or metadata.
-- Consumers must explicitly join metadata and current state by `deviceId`.
-- Store implementation libraries remain deferred until the relevant implementation stage.
+- Telemetry change не инвалидирует catalog и не пересоздаёт все устройства.
+- React использует узкие selectors, deck.gl — независимые batches.
+- Resync заменяет hot state без повторной загрузки геометрии/metadata.
+- Consumers явно соединяют данные по `deviceId`.

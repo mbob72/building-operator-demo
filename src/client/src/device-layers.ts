@@ -1,4 +1,8 @@
 import { IconLayer } from '@deck.gl/layers';
+import {
+  DataFilterExtension,
+  type DataFilterExtensionProps,
+} from '@deck.gl/extensions';
 import type {
   DeviceMetadata,
   DeviceStatus,
@@ -61,6 +65,7 @@ interface DeviceIconLayerOptions<T> {
   zoom: number;
   sizeMinPixels: number;
   dataDiff: DeviceDataRange[] | undefined;
+  visibleDeviceIds?: ReadonlySet<string>;
 }
 
 export const createDeviceIconLayer = <T>({
@@ -73,7 +78,8 @@ export const createDeviceIconLayer = <T>({
   zoom,
   sizeMinPixels,
   dataDiff,
-}: DeviceIconLayerOptions<T>) => new IconLayer<T>({
+  visibleDeviceIds,
+}: DeviceIconLayerOptions<T>) => new IconLayer<T, DataFilterExtensionProps<T>>({
   id,
   data,
   iconAtlas: '/device-atlas.svg',
@@ -96,10 +102,16 @@ export const createDeviceIconLayer = <T>({
   sizeMinPixels,
   sizeMaxPixels: 22,
   pickable: true,
+  extensions: [new DataFilterExtension({ filterSize: 1 })],
+  getFilterValue: (item) => (
+    visibleDeviceIds === undefined || visibleDeviceIds.has(getDevice(item).id) ? 1 : 0
+  ),
+  filterRange: [1, 1],
   autoHighlight: true,
   highlightColor: [255, 255, 255, 90],
   ...(dataDiff ? { _dataDiff: () => dataDiff } : {}),
   updateTriggers: {
+    getFilterValue: [visibleDeviceIds],
     getColor: [selectedDeviceId],
     getSize: [zoom],
   },

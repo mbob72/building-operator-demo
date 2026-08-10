@@ -1,91 +1,88 @@
-# Product specification
+# Спецификация продукта
 
-## Product outcome
+## Результат продукта
 
-Building Operator MVP is a 2D operator workstation for monitoring and simulated control of engineering systems in a large building. It is not a BIM editor and never connects a browser directly to KNX, DALI, Modbus, BACnet, fire, security, or access-control networks.
+Building Operator MVP — 2D-рабочее место для мониторинга и симулированного управления инженерными
+системами большого здания. Это не BIM-редактор. Браузер никогда не подключается напрямую к KNX,
+DALI, Modbus, BACnet, пожарным, охранным или access-control сетям.
 
-The primary user is an operator who must understand current state, find abnormal equipment, acknowledge alarms, and issue auditable simulated commands without losing context during high update rates or reconnects.
+Основной пользователь — оператор, которому нужно понимать текущее состояние, находить отклонения,
+подтверждать аварии и отправлять аудируемые симулированные команды без потери контекста при высокой
+частоте обновлений и reconnect.
 
-## Product scale
+## Масштаб
 
-- The representative fixture is in the tens-of-thousands range; the exact count is selected during the data stage.
-- A 50,000-device fixture is reserved for stress testing.
-- Floor mode is expected to show roughly 1,000–3,000 devices.
-- Building overview shows the complete representative fixture.
-- The source building is West Riverside Hospital. `floorId` is mandatory; `roomId` may be absent.
+- Репрезентативный fixture: 18 000 устройств; это не capacity limit.
+- Stress fixture: 50 000 устройств.
+- Floor mode показывает устройства выбранного этажа; building overview — полный каталог.
+- Исходное здание — West Riverside Hospital. `floorId` обязателен, `roomId` может отсутствовать.
 
-## Operator workflows
+## Сценарии оператора
 
-### Monitor a floor
+### Мониторинг этажа
 
-1. Select a floor and receive its stable device catalog plus viewport-aware plan geometry.
-2. Pan and zoom without converting devices into DOM nodes.
-3. Filter by type, protocol, connection, and operational status.
-4. Select a device and inspect metadata, current telemetry, alarms, and recent commands.
+1. Выбрать этаж и получить stable catalog вместе с viewport-aware геометрией.
+2. Выполнять pan/zoom, не превращая устройства в DOM-узлы.
+3. Фильтровать по типу, протоколу и operational status.
+4. Открыть устройство и увидеть metadata, telemetry, alarms и последние commands.
 
-### Triage an alarm
+### Работа с аварией
 
-1. See warning and critical state regardless of plan label LOD.
-2. Navigate from an alarm to the device on its floor.
-3. Acknowledge the alarm with operator identity and timestamp.
-4. Keep acknowledged and resolved states distinct from active state.
+1. Видеть warning/critical независимо от LOD подписей плана.
+2. Перейти из аварии к устройству на нужном этаже.
+3. Подтвердить аварию с identity оператора и timestamp.
+4. Не смешивать active, acknowledged и resolved состояния.
 
-### Issue a command
+### Отправка команды
 
-1. Create a local `draft` from a device capability.
-2. Confirm the action when the capability marks it as requiring confirmation.
-3. Submit an idempotent request and display `pending`.
-4. Show backend `accepted`, then terminal `executed`, `failed`, or `timedOut`.
-5. Keep desired command intent separate from actual telemetry; execution does not imply that telemetry already reflects the result.
+1. Создать локальный `draft` из capability устройства.
+2. Запросить подтверждение, если capability помечена критичной.
+3. Отправить idempotent request и показать `pending`.
+4. Показать backend `accepted`, затем `executed`, `failed` или `timedOut`.
+5. Хранить desired intent отдельно от actual telemetry: execution ещё не означает convergence.
 
-### Recover realtime state
+### Восстановление realtime
 
-1. Apply ordered, batched realtime events to indexed hot state.
-2. On reconnect, request replay after the last applied sequence.
-3. If replay is unavailable or the stream changed, replace hot state with an authoritative HTTP snapshot.
-4. Resume deltas after the snapshot sequence without treating a connection indicator as proof of state freshness.
+1. Применять ordered batches к индексированному hot state.
+2. После reconnect запросить replay после последнего применённого sequence.
+3. Если replay недоступен или stream сменился, атомарно заменить state authoritative snapshot.
+4. Продолжить deltas после snapshot sequence; индикатор соединения сам по себе не доказывает freshness.
 
-## MVP boundaries
+## Границы MVP
 
-Included in the complete MVP:
+Включены:
 
-- 2D floor and building-overview modes.
-- Stable device metadata, hot telemetry, alarms, and simulated commands.
-- Search, filters, picking, alarm navigation, acknowledgement, reconnect, and resync.
-- Reproducible offline IFC/data preparation and explicit `dataOrigin`.
-- Mock REST/WebSocket backend and load simulator.
+- 2D floor/building overview;
+- stable device metadata, hot telemetry, alarms и simulated commands;
+- поиск, фильтры, GPU picking, alarm navigation/acknowledgement, reconnect/resync;
+- воспроизводимая offline-подготовка IFC/данных и явный `dataOrigin`;
+- mock REST/WebSocket backend и load simulator;
+- автоматизированные functional, E2E и performance acceptance.
 
-Excluded:
+Исключены:
 
-- 3D BIM viewing, IFC parsing in the browser, CAD editing, and room inference.
-- Production authentication, authorization, audit retention, or persistent operational storage.
-- Direct physical-protocol connectivity or real equipment commands.
-- Physical simulation of lighting, HVAC, fire, or security systems.
-- Treating a synthetic binding as an IFC-derived or physical-system address.
+- 3D BIM, разбор IFC в браузере, CAD-редактирование и вывод помещений;
+- production authentication/authorization, долговременный audit и persistent operational storage;
+- прямые подключения к физическим протоколам и реальные команды оборудованию;
+- физическая симуляция света, HVAC, пожарных или охранных систем;
+- выдача synthetic binding за IFC-derived или физический адрес.
 
-## Safety and domain invariants
+## Инварианты безопасности и домена
 
-- Device IDs, alarm IDs, command IDs, client request IDs, and stream sequence numbers are stable and opaque.
-- Stable device metadata never contains hot `status` or mutable telemetry values.
-- A binding contains a protocol reference and provenance, never credentials.
-- `draft` exists only in UI state. A backend command begins at `pending`.
-- Repeating `clientRequestId` is idempotent and must not create a second command.
-- Alarm acknowledgement and terminal command transitions carry auditable timestamps and actor/error data.
-- Older device revisions and duplicate stream sequences are ignored; gaps trigger replay or snapshot resync.
+- Device/alarm/command/client-request IDs и stream sequence стабильны и opaque.
+- Stable metadata не содержит hot `status` или изменяемых telemetry values.
+- Binding содержит protocol reference и provenance, но никогда credentials.
+- `draft` существует только в UI; backend command начинается с `pending`.
+- Повтор `clientRequestId` идемпотентен и не создаёт вторую команду.
+- Alarm acknowledgement и terminal command transitions содержат audit timestamps и actor/error.
+- Старые device revisions и duplicate sequence игнорируются; gap запускает replay или resync.
 
-## Stage 0 result
+## Критерии завершённого MVP
 
-Stage 0 delivered and deployed the viewport-aware architectural scene without devices. Its scene API remains an independent contract.
-
-## Stage 1 scope and acceptance
-
-Stage 1 defines contracts; it does not add device rendering, simulator traffic, alarm UI, or command UI.
-
-1. Operator workflows and MVP boundaries are explicit.
-2. Building, floor, device, telemetry, alarm, and command entities have runtime-validatable contracts.
-3. Stable metadata, hot operational state, and UI-only state have separate ownership.
-4. REST payloads cover catalog, authoritative snapshot, alarm acknowledgement, command creation, and command lookup.
-5. Realtime payloads cover subscription, ordered batches, resume, heartbeat, and explicit resync fallback.
-6. JSON Schema is generated from the runtime contracts and checked in CI.
-7. Contract tests cover lifecycle invariants, state separation, event ordering, and snapshot fallback.
-8. No task from Stage 2 or later begins without separate approval.
+1. Runtime-контракты покрывают домен, REST, realtime и recovery.
+2. Stable metadata, hot operational state, UI state и renderer state разделены.
+3. Все пользовательские сценарии проверены в Chromium.
+4. Контракты, unit/type/build/smoke проходят `npm run verify`.
+5. Browser acceptance проходит `npm run test:e2e`.
+6. Матрица 18 000/50 000 × desktop/mobile проходит `npm run test:performance`.
+7. Архитектура, источники, лицензия, deployment, ограничения и риски записаны в репозитории.

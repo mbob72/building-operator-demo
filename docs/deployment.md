@@ -1,8 +1,8 @@
-# Live demo deployment
+# Развёртывание публичной демонстрации
 
-## Target
+## Целевая схема
 
-The live demo runs as one Render Web Service connected to the GitHub `main` branch:
+Демонстрация работает как один Render Web Service, связанный с веткой GitHub `main`:
 
 ```text
 Browser
@@ -12,55 +12,41 @@ Browser
        -> WebSocket simulator (/api/v1/realtime)
 ```
 
-The service is configured by `render.yaml`. GitHub Actions must pass before Render deploys a commit.
+Сервис описан в `render.yaml`; GitHub Actions должны пройти до deployment. Публичный URL:
+<https://building-operator-demo.onrender.com>.
 
-Public URL: <https://building-operator-demo.onrender.com>.
-
-## Local production verification
+## Локальная production-проверка
 
 ```bash
 npm ci
 npm run verify
-```
-
-To run the production server manually:
-
-```bash
 npm run build
 NODE_ENV=production HOST=127.0.0.1 PORT=4174 npm start
 ```
 
-Open <http://127.0.0.1:4174>.
+После запуска откройте <http://127.0.0.1:4174>.
 
-## GitHub setup
+## Настройка GitHub и Render
 
-1. Use the public repository `mbob72/building-operator-demo`.
-2. Push the local `main` branch.
-3. Confirm that the `verify` and `e2e` GitHub Actions jobs pass.
-4. Protect `main` if the repository workflow requires pull requests.
+1. Использовать публичный repository `mbob72/building-operator-demo`.
+2. Убедиться, что jobs `verify` и `e2e` проходят для `main`.
+3. В Render создать Blueprint, подключить repository и выбрать корневой `render.yaml`.
+4. Проверить service name/plan и дождаться GitHub checks.
+5. Проверить `/api/health`, `/api/floors`, `/api/scene/query`, snapshot, realtime, commands и UI.
 
-## Render setup
+Для текущей демонстрации secret environment variables не нужны.
 
-1. In Render, create a new Blueprint.
-2. Connect the GitHub repository.
-3. Select the root `render.yaml`.
-4. Confirm the service name and free/paid plan.
-5. Allow the first deployment to wait for GitHub checks.
-6. Verify `/api/health`, `/api/floors`, `/api/scene/query`, `/api/v1/state/snapshot`, `/api/v1/realtime`, command creation, and the browser viewer.
+## Безопасность демонстрации
 
-No secret environment variables are required for the current Stage 7 demo.
+- Публиковать только открытые, атрибутированные или synthetic данные.
+- Никогда не добавлять credentials физических KNX/DALI/Modbus/BACnet и других систем.
+- Оставлять выполнение команд симулированным.
+- Сохранять видимую метку `OPERATOR DEMO`, пока доступны simulated controls.
+- Считать filesystem Render и in-memory состояние симулятора временными.
 
-## Demo safety
+## Эксплуатационные ограничения
 
-- Deploy only public, attributed, or synthetic data.
-- Never add KNX, DALI, Modbus, BACnet, or other physical-system credentials.
-- Keep command execution simulated.
-- Keep the visible `OPERATOR DEMO` marker while simulated command controls are available.
-- Treat the Render filesystem and in-memory simulator state as ephemeral.
-
-## Operational limitations
-
-- A free service can have a cold-start delay after inactivity.
-- A redeploy or restart can interrupt WebSocket connections.
-- Clients must reconnect and request a fresh snapshot.
-- The source IFC is intentionally excluded from the deployment.
+- Free service может задерживать cold start после простоя.
+- Redeploy/restart разрывает WebSocket; client должен reconnect и получить свежий snapshot.
+- Исходные IFC намеренно не входят в deployment.
+- Production authentication, persistent storage и настоящий protocol adapter в MVP отсутствуют.

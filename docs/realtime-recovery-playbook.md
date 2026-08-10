@@ -109,7 +109,7 @@ server replay хранит события начиная с 1
 
 Server продолжает работу и создаёт события `125..180`. Store остаётся на `124`.
 
-### Reconnect
+### Повторное подключение
 
 ```text
 socket close
@@ -125,7 +125,7 @@ socket close
 
 HTTP snapshot не нужен, потому что server всё ещё хранит непрерывный хвост после `124`.
 
-### Reconnect delay
+### Задержка повторного подключения
 
 Задержка вычисляется так:
 
@@ -178,7 +178,7 @@ server replay range = 500..549
 
 Client просит события после `124`, но `125..499` уже удалены из bounded replay.
 
-### Ответ server
+### Ответ сервера
 
 ```json
 {
@@ -300,7 +300,7 @@ heartbeat = stream A / latestSequence 610
 
 `markHeartbeat()` возвращает `false`, потому что server находится впереди. Client отправляет новый `resume(A, afterSequence=600)` на том же socket.
 
-Server:
+Сервер:
 
 1. отправляет новый `hello`;
 2. снимает прежнюю live subscription этого socket;
@@ -365,7 +365,7 @@ Guard `resyncing` не позволяет нескольким проблемн�
 
 ## HTTP mutation во время нормального соединения
 
-### Alarm acknowledgement
+### Подтверждение аварии
 
 ```text
 POST acknowledge
@@ -381,7 +381,7 @@ HTTP response и WebSocket event могут прийти в любом поря�
 | HTTP, затем WebSocket | UI сразу видит alarm; socket позже двигает cursor |
 | WebSocket, затем HTTP | socket обновляет alarm и cursor; одинаковый HTTP upsert игнорируется |
 
-### Command creation
+### Создание команды
 
 Backend публикует lifecycle:
 
@@ -391,7 +391,7 @@ pending → accepted → executed | failed | timedOut
 
 HTTP обычно возвращает `pending`, а WebSocket может уже доставить `accepted`. Direct `upsertCommand()` сравнивает lifecycle rank и не позволяет старому HTTP состоянию выполнить regression.
 
-## Recovery checklist для диагностики
+## Контрольный список восстановления
 
 | Вопрос | Где смотреть |
 |---|---|

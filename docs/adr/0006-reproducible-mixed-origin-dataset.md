@@ -1,26 +1,28 @@
-# ADR-0006: Reproducible mixed-origin device dataset
+# ADR-0006: Воспроизводимый набор устройств смешанного происхождения
 
-- Status: accepted
-- Date: 2026-08-07
+- Статус: принят
+- Дата: 2026-08-07
 
-## Context
+## Контекст
 
-The source IFC disciplines contain useful real MEP elements, but not every product category and floor required by the operator MVP. Treating generated devices as IFC-derived would make the demo misleading. Allowing timestamps, gzip headers, or random placement to vary would also prevent reliable checks and performance comparisons.
+IFC содержит полезные реальные MEP-элементы, но не все категории и этажи MVP. Нельзя выдавать
+generated devices за IFC-derived. Изменяемые timestamps, gzip headers или random placement также
+мешают проверкам и сравнению производительности.
 
-## Decision
+## Решение
 
-1. Preserve every included IFC device's source file, global ID, IFC type, numeric IFC ID, floor, and normalized position.
-2. Mark every device as `ifc`, `derived`, or `synthetic`; require runtime consistency between `dataOrigin` and provenance.
-3. Keep operational bindings simulated until a physical integration exists, regardless of metadata origin.
-4. Use `ObjectPlacement` when it falls inside the architectural floor bounds; retry rejected placements with the world-space geometry centroid.
-5. Exclude candidates still outside the prepared floor bounds and record deterministic reason counts in the manifest.
-6. Fill approved category and floor targets with a fixed seed and deterministic ordering.
-7. Fix dataset time and gzip metadata, publish raw/compressed checksums, and require byte-for-byte regeneration.
-8. Keep 18,000 as the representative fixture and 50,000 as a separate stress fixture; neither value is a product capacity limit.
+1. Сохранять source file, global ID, IFC type/ID, floor и normalized position каждого IFC device.
+2. Помечать происхождение как `ifc`, `derived` или `synthetic` и валидировать согласованность.
+3. До физической интеграции оставлять operational bindings simulated независимо от происхождения.
+4. Использовать `ObjectPlacement` внутри floor bounds; иначе пробовать world-space geometry centroid.
+5. Исключать оставшиеся out-of-bounds candidates и записывать deterministic reason counts.
+6. Заполнять утверждённые категории/этажи с fixed seed и deterministic ordering.
+7. Фиксировать dataset time/gzip metadata, checksums и требовать byte-for-byte regeneration.
+8. Хранить 18 000 как representative и 50 000 как stress fixture; это не capacity limits.
 
-## Consequences
+## Последствия
 
-- The UI can explain whether a device came from IFC or was synthesized without inventing physical connectivity.
-- Regeneration and CI validation detect accidental source, schema, distribution, or serialization changes.
-- Some valid IFC geometry can be omitted when it lies outside the prepared architectural bounds; manifests and the data-quality report make this visible.
-- Room assignment remains unknown until a separate spatial-containment step is implemented.
+- UI честно показывает IFC/synthetic origin без выдуманной физической связи.
+- Regeneration/CI выявляют изменения источника, схемы, распределения и сериализации.
+- IFC geometry вне подготовленных bounds может быть исключена и отражается в manifest/report.
+- Room assignment остаётся неизвестным до отдельного spatial-containment этапа.

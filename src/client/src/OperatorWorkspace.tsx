@@ -36,14 +36,15 @@ export const OperatorWorkspace = ({ floors }: OperatorWorkspaceProps) => {
           <FloorScene
             floor={model.selectedFloor}
             floors={floors}
-            devices={model.filteredDevices}
+            devices={model.devices}
+            visibleDeviceIds={model.visibleDeviceIds}
+            visibleDeviceCount={model.filteredDevices.length}
             alarmDevices={model.devices}
             alarmsById={model.alarmsById}
             statusByDeviceId={model.statusByDeviceId}
             dirtyStatusDeviceIds={model.dirtyStatusDeviceIds}
             statusVersion={model.statusVersion}
             priorityMembershipVersion={model.priorityMembershipVersion}
-            priorityMembershipChanged={model.priorityMembershipChanged}
             selectedDevice={model.selectedDevice}
             onSelectDevice={model.onSelectDevice}
           />
@@ -51,14 +52,15 @@ export const OperatorWorkspace = ({ floors }: OperatorWorkspaceProps) => {
         {!model.requestError && !model.isLoading && model.viewMode === 'overview' && (
           <BuildingOverview
             floors={floors}
-            devices={model.filteredDevices}
+            devices={model.devices}
+            visibleDeviceIds={model.visibleDeviceIds}
+            visibleDeviceCount={model.filteredDevices.length}
             alarmDevices={model.devices}
             alarmsById={model.alarmsById}
             statusByDeviceId={model.statusByDeviceId}
             dirtyStatusDeviceIds={model.dirtyStatusDeviceIds}
             statusVersion={model.statusVersion}
             priorityMembershipVersion={model.priorityMembershipVersion}
-            priorityMembershipChanged={model.priorityMembershipChanged}
             selectedDevice={model.selectedDevice}
             onSelectDevice={model.onSelectDevice}
           />

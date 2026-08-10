@@ -1,7 +1,7 @@
-# RealtimeClient and RealtimeHotStore
+# `RealtimeClient` и `RealtimeHotStore`
 
 - Актуально на: 2026-08-10
-- Текущий статус: объединённый Stage 8–9 завершён и принят; Stage 10 не начат
+- Текущий статус: объединённые этапы 10–11 завершены и приняты; MVP завершён
 - Назначение: описание обязанностей и совместной работы двух основных realtime-классов frontend.
 
 ## Кратко
@@ -179,7 +179,7 @@ invalid-state       → HTTP resync
 
 Связка вызова и recovery находится в [`realtime-client.ts:134`](../src/client/src/realtime-client.ts#L134).
 
-### Reconnect
+### Повторное подключение
 
 Неожиданный `close` вызывает [`scheduleReconnect()`](../src/client/src/realtime-client.ts#L165).
 
@@ -197,7 +197,7 @@ Math.min(250 * 2 ** (attempt - 1), 5_000)
 
 После успешного `open` counter сбрасывается. Новый socket resume-ится от cursor, который store успел применить до disconnect.
 
-### Resync
+### Полная синхронизация
 
 [`resync()`](../src/client/src/realtime-client.ts#L175):
 
@@ -265,12 +265,11 @@ Renderer state
   dirtyStatusDeviceIds
   statusVersion
   priorityMembershipVersion
-  priorityMembershipChanged
 ```
 
 `emptySnapshot()` в [`realtime-hot-store.ts:46`](../src/client/src/realtime-hot-store.ts#L46) задаёт безопасное состояние до bootstrap.
 
-### Subscription API
+### API подписки
 
 Store предоставляет `getSnapshot` и `subscribe` в [`realtime-hot-store.ts:69`](../src/client/src/realtime-hot-store.ts#L69). Это контракт, необходимый `useSyncExternalStore`.
 
@@ -295,12 +294,12 @@ Snapshot replacement также:
 - устанавливает `ready: true`;
 - очищает предыдущую ошибку;
 - помечает все device IDs dirty;
-- увеличивает status/membership versions;
-- требует полной renderer regroup через `priorityMembershipChanged: true`.
+- увеличивает status/membership versions; основной layer сохраняет стабильный порядок, а все IDs
+  в dirty set обеспечивают полное начальное построение attributes.
 
 Эта операция атомарна: старые hot indexes и старый cursor не смешиваются с новым snapshot.
 
-### Connection state
+### Состояние соединения
 
 [`setConnection()`](../src/client/src/realtime-hot-store.ts#L124) меняет только connection/error fields и не создаёт новые domain maps.
 
@@ -315,7 +314,7 @@ Snapshot replacement также:
 
 [`applyBatch()`](../src/client/src/realtime-hot-store.ts#L146) — основная domain transition.
 
-#### 1. Stream-level validation
+#### 1. Проверка stream
 
 В [`строках 147–150`](../src/client/src/realtime-hot-store.ts#L147):
 
@@ -325,7 +324,7 @@ Snapshot replacement также:
 
 Если batch частично пересекается с уже применённым cursor, store отбрасывает старую часть и проверяет непрерывность оставшихся events.
 
-#### 2. Copy-on-write
+#### 2. Копирование при записи
 
 В начале transition новые maps не создаются. Они появляются только для реально изменяемого domain:
 
@@ -338,7 +337,7 @@ commandsById ??= new Map(currentCommands)
 
 Это сохраняет identity неизменившихся indexes. React selector, читающий другой telemetry object или status map, не получает ложное изменение.
 
-#### 3. Telemetry patch
+#### 3. Patch телеметрии
 
 Ветка начинается в [`realtime-hot-store.ts:162`](../src/client/src/realtime-hot-store.ts#L162).
 
@@ -367,7 +366,8 @@ immutable request fields, rank `pending < accepted < terminal`, запрещае
 - обновляет отдельный `statusByDeviceId`;
 - добавляет device ID в `dirtyStatusDeviceIds`;
 - увеличивает `statusVersion` при publish;
-- сравнивает old/new priority membership через `isPriorityStatus`.
+- сравнивает old/new priority membership через `isPriorityStatus` для счётчиков/версии;
+  основной device layer при этом сохраняет стабильный порядок.
 
 `priorityMembershipVersion` увеличивается только при переходе между группами:
 
@@ -375,9 +375,10 @@ immutable request fields, rank `pending < accepted < terminal`, запрещае
 normal/offline/unknown ↔ warning/critical
 ```
 
-Переход внутри одной группы, например `warning → critical`, позволяет renderer использовать partial dirty ranges.
+Любой status transition основного слоя использует partial dirty ranges; membership version больше
+не перегруппировывает большие instance arrays.
 
-#### 5. Alarm и command upserts
+#### 5. Upsert аварий и команд
 
 Alarm и command events содержат полные records и записываются по ID. Stage 6 consumers подписываются на `alarmsById`; `DeviceCard` подписывается на `commandsById` и локально выбирает records текущего устройства.
 
@@ -385,7 +386,7 @@ Alarm и command events содержат полные records и записыв�
 
 `RealtimeHotStore.upsertCommand()` выполняет такой же cursor-neutral reconciliation для HTTP create/lookup response. Lifecycle rank защищает от race, в котором sequenced `accepted` пришёл раньше завершения HTTP request, а response всё ещё содержит `pending`. Conflicting terminal outcomes не заменяют текущий record; ordered stream остаётся владельцем cursor.
 
-#### 6. Atomic publish
+#### 6. Атомарная публикация
 
 В [`realtime-hot-store.ts:195`](../src/client/src/realtime-hot-store.ts#L195) store публикует один итоговый snapshot:
 
@@ -396,7 +397,7 @@ Alarm и command events содержат полные records и записыв�
 - обновляются timestamps/errors/versions;
 - listeners вызываются один раз.
 
-## Совместный lifecycle
+## Совместный жизненный цикл
 
 ### Нормальный запуск
 
@@ -446,7 +447,7 @@ client receives batch 503–526
   → resume from recovered cursor
 ```
 
-## React consumption
+## Потребление в React
 
 Store подключается к React через [`useRealtimeSelector`](../src/client/src/use-realtime-state.ts#L7). Consumers выбирают минимальное значение:
 

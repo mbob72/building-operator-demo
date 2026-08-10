@@ -1,17 +1,16 @@
-# Transport contracts
+# Транспортные контракты
 
-Runtime contracts live in `src/shared` and are the source of truth. The JSON Schema files in this directory are generated for backend-independent consumers.
+Runtime-контракты находятся в `src/shared` и являются source of truth. JSON Schema в этом каталоге
+генерируются для потребителей, не зависящих от backend.
 
 ```bash
 npm run contracts:generate
 npm run contracts:check
 ```
 
-- `scene.schema.json` is the Stage 0 viewport-scene contract.
-- `domain.schema.json` contains stable device metadata and hot operational entities.
-- `api.schema.json` contains REST request and response payloads.
-- `realtime.schema.json` contains WebSocket client/server messages and event batches.
+- `scene.schema.json` — viewport-scene контракт этапа 0.
+- `domain.schema.json` — stable metadata устройств и hot operational entities.
+- `api.schema.json` — payload запросов и ответов REST.
+- `realtime.schema.json` — клиентские/серверные сообщения ordered realtime и recovery.
 
-Do not edit generated schema files by hand.
-
-JSON Schema captures the portable wire shape. Cross-record and lifecycle invariants such as catalog references, alarm audit fields, contiguous stream sequences, and command terminal timestamps are enforced by the runtime schemas and documented in the ADRs.
+Не редактируйте сгенерированные файлы вручную. Исключение — legacy `scene.schema.json` этапа 0.
