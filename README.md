@@ -29,7 +29,7 @@ npm run contracts:generate
 npm run contracts:check
 ```
 
-See [`docs/product.md`](docs/product.md), [`docs/architecture.md`](docs/architecture.md), [`docs/architecture-todo.md`](docs/architecture-todo.md), [`docs/frontend-architecture.md`](docs/frontend-architecture.md), [`docs/frontend-data-consumption.md`](docs/frontend-data-consumption.md), [`docs/realtime-client-and-hot-store.md`](docs/realtime-client-and-hot-store.md), [`docs/backend-architecture.md`](docs/backend-architecture.md), and the stage reports through [`reports/stage-seven.md`](reports/stage-seven.md).
+See [`docs/product.md`](docs/product.md), [`docs/architecture.md`](docs/architecture.md), [`docs/architecture-todo.md`](docs/architecture-todo.md), [`docs/frontend-architecture.md`](docs/frontend-architecture.md), [`docs/frontend-data-consumption.md`](docs/frontend-data-consumption.md), the Confluence-oriented [`docs/realtime-data-flow-confluence.md`](docs/realtime-data-flow-confluence.md), [`docs/realtime-client-and-hot-store.md`](docs/realtime-client-and-hot-store.md), [`docs/backend-architecture.md`](docs/backend-architecture.md), and the stage reports through [`reports/stage-seven.md`](reports/stage-seven.md).
 
 ## Production mode
 
