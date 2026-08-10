@@ -1,0 +1,153 @@
+{
+  "schemaVersion": 1,
+  "measuredAt": "2026-08-10T19:54:05.050Z",
+  "fixture": "stress",
+  "profile": "mobile-chromium",
+  "expectedDevices": 50000,
+  "environment": {
+    "platform": "darwin",
+    "release": "25.2.0",
+    "cpu": "Apple M1 Pro",
+    "logicalCpuCount": 10,
+    "totalMemoryBytes": 17179869184,
+    "userAgent": "Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.7922.34 Mobile Safari/537.36",
+    "viewport": {
+      "width": 412,
+      "height": 839
+    },
+    "graphics": {
+      "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M1 Pro, Unspecified Version)",
+      "vendor": "Google Inc. (Apple)"
+    }
+  },
+  "navigation": {
+    "responseEndMs": 6.100000023841858,
+    "domContentLoadedMs": 135.80000007152557,
+    "loadMs": 136.5,
+    "transferSizeBytes": 916,
+    "decodedBodySizeBytes": 616
+  },
+  "frameIntervalsMs": {
+    "floor": {
+      "count": 175,
+      "p50": 8.300000000000182,
+      "p95": 10.200000000000273,
+      "p99": 26.200000000000273,
+      "max": 26.90000000000009
+    },
+    "overview": {
+      "count": 209,
+      "p50": 8.300000000000182,
+      "p95": 10.300000000000182,
+      "p99": 39.80000000000018,
+      "max": 115.80000000000018
+    },
+    "realtimeBurst": {
+      "count": 523,
+      "p50": 8.300000000000182,
+      "p95": 10.200000000000728,
+      "p99": 10.300000000001091,
+      "max": 24.899999999999636
+    }
+  },
+  "longTasksMs": {
+    "count": 8,
+    "p50": 95,
+    "p95": 159,
+    "p99": 159,
+    "max": 159
+  },
+  "longTasksByPhase": {
+    "startup": {
+      "count": 6,
+      "p50": 87,
+      "p95": 159,
+      "p99": 159,
+      "max": 159
+    },
+    "overview-navigation": {
+      "count": 2,
+      "p50": 95,
+      "p95": 96,
+      "p99": 96,
+      "max": 96
+    }
+  },
+  "longTaskSamples": [
+    {
+      "phase": "startup",
+      "startTimeMs": 80.89999997615814,
+      "durationMs": 55
+    },
+    {
+      "phase": "startup",
+      "startTimeMs": 1087.8999999761581,
+      "durationMs": 133
+    },
+    {
+      "phase": "startup",
+      "startTimeMs": 1221,
+      "durationMs": 99
+    },
+    {
+      "phase": "startup",
+      "startTimeMs": 1321.3999999761581,
+      "durationMs": 159
+    },
+    {
+      "phase": "startup",
+      "startTimeMs": 1482.2000000476837,
+      "durationMs": 52
+    },
+    {
+      "phase": "startup",
+      "startTimeMs": 1580.1000000238419,
+      "durationMs": 87
+    },
+    {
+      "phase": "overview-navigation",
+      "startTimeMs": 4172.700000047684,
+      "durationMs": 95
+    },
+    {
+      "phase": "overview-navigation",
+      "startTimeMs": 4324.899999976158,
+      "durationMs": 96
+    }
+  ],
+  "heap": {
+    "beforeBytes": 99494052,
+    "afterBytes": 116681436,
+    "deltaBytes": 17187384
+  },
+  "react": {
+    "commitCount": 98,
+    "actualDurationMs": {
+      "count": 98,
+      "p50": 4.199999928474426,
+      "p95": 20.100000023841858,
+      "p99": 82.70000004768372,
+      "max": 82.70000004768372
+    }
+  },
+  "realtime": {
+    "batchCount": 57,
+    "eventCount": 5936,
+    "sequenceDeltaDuringBurst": 5432,
+    "batchApplyMs": {
+      "count": 57,
+      "p50": 3.700000047683716,
+      "p95": 6.700000047683716,
+      "p99": 8.200000047683716,
+      "max": 8.200000047683716
+    },
+    "latencyMs": {
+      "count": 57,
+      "p50": 6,
+      "p95": 24,
+      "p99": 136,
+      "max": 136
+    }
+  },
+  "domNodes": 221
+}
