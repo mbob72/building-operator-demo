@@ -53,6 +53,69 @@ const commandStateRank: Record<CommandRecord['state'], number> = {
   timedOut: 2,
 };
 
+const alarmStateRank: Record<Alarm['state'], number> = {
+  active: 0,
+  acknowledged: 1,
+  resolved: 2,
+};
+
+type ReconcileResult<T> = { status: 'use-current' | 'use-next'; value: T }
+  | { status: 'invalid' };
+
+const reconcileAlarm = (current: Alarm | undefined, next: Alarm): ReconcileResult<Alarm> => {
+  if (!current) return { status: 'use-next', value: next };
+  if (current.deviceId !== next.deviceId
+    || current.severity !== next.severity
+    || current.code !== next.code
+    || current.createdAt !== next.createdAt) return { status: 'invalid' };
+  if (JSON.stringify(current) === JSON.stringify(next)) {
+    return { status: 'use-current', value: current };
+  }
+  if (next.updatedAt < current.updatedAt
+    || alarmStateRank[next.state] < alarmStateRank[current.state]) {
+    return { status: 'use-current', value: current };
+  }
+  if (next.updatedAt === current.updatedAt && next.state === current.state) {
+    return { status: 'invalid' };
+  }
+  return { status: 'use-next', value: next };
+};
+
+const reconcileCommand = (
+  current: CommandRecord | undefined,
+  next: CommandRecord,
+): ReconcileResult<CommandRecord> => {
+  if (!current) return { status: 'use-next', value: next };
+  if (current.clientRequestId !== next.clientRequestId
+    || current.deviceId !== next.deviceId
+    || JSON.stringify(current.intent) !== JSON.stringify(next.intent)
+    || current.requestedAt !== next.requestedAt
+    || current.requestedBy !== next.requestedBy
+    || JSON.stringify(current.confirmation) !== JSON.stringify(next.confirmation)) {
+    return { status: 'invalid' };
+  }
+  if (JSON.stringify(current) === JSON.stringify(next)) {
+    return { status: 'use-current', value: current };
+  }
+  const currentRank = commandStateRank[current.state];
+  const nextRank = commandStateRank[next.state];
+  if (nextRank < currentRank) return { status: 'use-current', value: current };
+  if (nextRank === currentRank && current.state !== next.state) return { status: 'invalid' };
+  if (current.state === 'executed' && next.state === 'executed') {
+    if (current.resultTelemetryRevision !== null && next.resultTelemetryRevision === null) {
+      return { status: 'use-current', value: current };
+    }
+    if (current.resultTelemetryRevision !== null
+      && next.resultTelemetryRevision !== null
+      && current.resultTelemetryRevision !== next.resultTelemetryRevision) {
+      return { status: 'invalid' };
+    }
+  } else if (nextRank === currentRank) {
+    return { status: 'invalid' };
+  }
+  return { status: 'use-next', value: next };
+};
+
 const emptySnapshot = (): RealtimeHotSnapshot => ({
   telemetryByDeviceId: new Map(),
   statusByDeviceId: new Map(),
@@ -94,9 +157,11 @@ export class RealtimeHotStore {
   upsertAlarm(alarm: Alarm) {
     const parsed = AlarmSchema.parse(alarm);
     const current = this.snapshot.alarmsById.get(parsed.id);
-    if (current && JSON.stringify(current) === JSON.stringify(parsed)) return;
+    if (!this.snapshot.telemetryByDeviceId.has(parsed.deviceId)) return;
+    const reconciled = reconcileAlarm(current, parsed);
+    if (reconciled.status !== 'use-next') return;
     const alarmsById = new Map(this.snapshot.alarmsById);
-    alarmsById.set(parsed.id, parsed);
+    alarmsById.set(parsed.id, reconciled.value);
     this.publish({
       ...this.snapshot,
       alarmsById,
@@ -107,10 +172,11 @@ export class RealtimeHotStore {
   upsertCommand(command: CommandRecord) {
     const parsed = CommandRecordSchema.parse(command);
     const current = this.snapshot.commandsById.get(parsed.id);
-    if (current && commandStateRank[current.state] > commandStateRank[parsed.state]) return;
-    if (current && JSON.stringify(current) === JSON.stringify(parsed)) return;
+    if (!this.snapshot.telemetryByDeviceId.has(parsed.deviceId)) return;
+    const reconciled = reconcileCommand(current, parsed);
+    if (reconciled.status !== 'use-next') return;
     const commandsById = new Map(this.snapshot.commandsById);
-    commandsById.set(parsed.id, parsed);
+    commandsById.set(parsed.id, reconciled.value);
     this.publish({
       ...this.snapshot,
       commandsById,
@@ -207,11 +273,23 @@ export class RealtimeHotStore {
           }
         }
       } else if (event.type === 'alarm.upsert') {
+        if (!(telemetryByDeviceId ?? this.snapshot.telemetryByDeviceId)
+          .has(event.payload.deviceId)) return 'invalid-state';
+        const current = (alarmsById ?? this.snapshot.alarmsById).get(event.payload.id);
+        const reconciled = reconcileAlarm(current, event.payload);
+        if (reconciled.status === 'invalid') return 'invalid-state';
+        if (reconciled.status === 'use-current') continue;
         alarmsById ??= new Map(this.snapshot.alarmsById);
-        alarmsById.set(event.payload.id, event.payload);
+        alarmsById.set(event.payload.id, reconciled.value);
       } else if (event.type === 'command.upsert') {
+        if (!(telemetryByDeviceId ?? this.snapshot.telemetryByDeviceId)
+          .has(event.payload.deviceId)) return 'invalid-state';
+        const current = (commandsById ?? this.snapshot.commandsById).get(event.payload.id);
+        const reconciled = reconcileCommand(current, event.payload);
+        if (reconciled.status === 'invalid') return 'invalid-state';
+        if (reconciled.status === 'use-current') continue;
         commandsById ??= new Map(this.snapshot.commandsById);
-        commandsById.set(event.payload.id, event.payload);
+        commandsById.set(event.payload.id, reconciled.value);
       }
     }
 

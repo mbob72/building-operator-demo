@@ -8,6 +8,14 @@
 
 Нет.
 
+### Проверка на границе Stage 8–9
+
+Проведена 2026-08-10; Stage 8–9 завершён и принят пользователем. Новых незакрытых
+архитектурных дефектов не выявлено. Недолговечность replay/commands/idempotency после restart,
+отсутствие offline command queue и synthetic telemetry convergence являются документированными
+границами MVP (`A-010`, `A-019`), а не забытыми reliability requirements. Stage 10 performance
+benchmark остаётся отдельным и не начат.
+
 ### Проверка на границе Stage 7
 
 Проведена 2026-08-10; Stage 7 принят пользователем. Новых незакрытых архитектурных дефектов не выявлено. Ephemeral in-memory command queue/idempotency, untrusted mock actor и delayed synthetic telemetry convergence вместо physical confirmation зафиксированы как границы симулятора в `docs/assumptions.md` и `reports/stage-seven.md`. Сценарии команд во время disconnect намеренно остаются Stage 8; Stage 8 не начат.

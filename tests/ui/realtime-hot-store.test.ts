@@ -220,4 +220,110 @@ describe('RealtimeHotStore', () => {
     expect(store.getSnapshot().alarmsById.get('alarm-1')).toEqual(alarm);
     expect(store.getSnapshot().sequence).toBe(11);
   });
+
+  it('applies only the fresh suffix of an overlapping replay batch', () => {
+    const store = new RealtimeHotStore();
+    store.replaceSnapshot(initialSnapshot());
+    const overlapping = batch([
+      {
+        sequence: 10,
+        event: {
+          type: 'telemetry.patch',
+          payload: {
+            deviceId: 'device-1', revision: 2, observedAt: timestamp, receivedAt: timestamp,
+            values: { duplicate: true },
+          },
+        },
+      },
+      {
+        sequence: 11,
+        event: {
+          type: 'telemetry.patch',
+          payload: {
+            deviceId: 'device-1', revision: 3, observedAt: timestamp, receivedAt: timestamp,
+            values: { fresh: true },
+          },
+        },
+      },
+    ]);
+
+    expect(store.applyBatch(overlapping)).toBe('applied');
+    expect(store.getSnapshot().sequence).toBe(11);
+    expect(store.getSnapshot().telemetryByDeviceId.get('device-1')?.values)
+      .toEqual({ fresh: true });
+  });
+
+  it('does not regress command lifecycle from a stale event with a fresh stream sequence', () => {
+    const store = new RealtimeHotStore();
+    const accepted = makeCommand('command-1', 'device-1', {
+      state: 'accepted',
+      acceptedAt: '2026-08-09T12:00:01.000Z',
+    });
+    store.replaceSnapshot({ ...initialSnapshot(), commands: [accepted] });
+    const staleBatch = EventBatchMessageSchema.parse({
+      type: 'event.batch',
+      streamId: 'stream-1',
+      emittedAt: timestamp,
+      fromSequence: 11,
+      toSequence: 11,
+      events: [{
+        sequence: 11,
+        event: { type: 'command.upsert', payload: makeCommand('command-1', 'device-1') },
+      }],
+    });
+
+    expect(store.applyBatch(staleBatch)).toBe('applied');
+    expect(store.getSnapshot().sequence).toBe(11);
+    expect(store.getSnapshot().commandsById.get('command-1')).toEqual(accepted);
+  });
+
+  it('rejects an unknown-device event atomically after valid events in the same batch', () => {
+    const store = new RealtimeHotStore();
+    store.replaceSnapshot(initialSnapshot());
+    const listener = vi.fn();
+    store.subscribe(listener);
+    const alarmBatch = EventBatchMessageSchema.parse({
+      type: 'event.batch',
+      streamId: 'stream-1',
+      emittedAt: timestamp,
+      fromSequence: 11,
+      toSequence: 12,
+      events: [
+        { sequence: 11, event: { type: 'alarm.upsert', payload: makeAlarm('alarm-ok', 'device-1') } },
+        { sequence: 12, event: { type: 'alarm.upsert', payload: makeAlarm('alarm-unknown', 'device-unknown') } },
+      ],
+    });
+
+    expect(store.applyBatch(alarmBatch)).toBe('invalid-state');
+    expect(store.getSnapshot().sequence).toBe(10);
+    expect(store.getSnapshot().alarmsById.size).toBe(0);
+    expect(listener).not.toHaveBeenCalled();
+  });
+
+  it('applies a 500-alarm burst with one publication', () => {
+    const store = new RealtimeHotStore();
+    store.replaceSnapshot(initialSnapshot());
+    const listener = vi.fn();
+    store.subscribe(listener);
+    const events = Array.from({ length: 500 }, (_, index) => ({
+      sequence: 11 + index,
+      event: {
+        type: 'alarm.upsert' as const,
+        payload: makeAlarm(`alarm-burst-${index}`, index % 2 === 0 ? 'device-1' : 'device-2'),
+      },
+    }));
+    const alarmBatch = EventBatchMessageSchema.parse({
+      type: 'event.batch',
+      streamId: 'stream-1',
+      emittedAt: timestamp,
+      fromSequence: 11,
+      toSequence: 510,
+      events,
+    });
+
+    expect(store.applyBatch(alarmBatch)).toBe('applied');
+    expect(store.getSnapshot().alarmsById.size).toBe(500);
+    expect(store.getSnapshot().sequence).toBe(510);
+    expect(listener).toHaveBeenCalledOnce();
+  });
 });

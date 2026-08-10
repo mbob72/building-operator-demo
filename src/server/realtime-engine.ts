@@ -113,7 +113,7 @@ export class RealtimeEngine {
   private simulatorTimer: ReturnType<typeof setInterval> | undefined;
 
   constructor(options: RealtimeEngineOptions = {}) {
-    this.streamId = options.streamId ?? `stage-7-${randomUUID()}`;
+    this.streamId = options.streamId ?? `stage-8-9-${randomUUID()}`;
     this.replayLimit = options.replayLimit ?? REALTIME_REPLAY_LIMIT;
     this.now = options.now ?? (() => new Date());
     this.commandAcceptanceDelayMs = options.commandAcceptanceDelayMs
@@ -160,7 +160,7 @@ export class RealtimeEngine {
     });
     const selectedDeviceIds = new Set(telemetry.map((item) => item.deviceId));
     return StateSnapshotSchema.parse({
-      snapshotId: `stage-7-live-snapshot-v1:${this.sequence}:${scopeIdFor(floorIds)}`,
+      snapshotId: `stage-8-9-live-snapshot-v1:${this.sequence}:${scopeIdFor(floorIds)}`,
       buildingId: deviceCatalog.building.id,
       streamId: this.streamId,
       sequence: this.sequence,

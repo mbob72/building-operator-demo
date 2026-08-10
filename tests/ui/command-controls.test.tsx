@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CommandControls } from '../../src/client/src/CommandControls';
 import { useOperatorStore } from '../../src/client/src/operator-store';
 import { operatorRealtimeStore } from '../../src/client/src/realtime-hot-store';
@@ -15,7 +15,23 @@ const commandDevice = makeDevice('device-command', {
   },
 });
 
+beforeEach(() => {
+  operatorRealtimeStore.reset();
+  operatorRealtimeStore.replaceSnapshot({
+    snapshotId: 'command-controls-snapshot',
+    buildingId: 'west-riverside',
+    streamId: 'stream-command-controls',
+    sequence: 0,
+    generatedAt: '2026-08-09T12:00:00.000Z',
+    telemetry: [makeTelemetry(commandDevice.id, 'normal')],
+    alarms: [],
+    commands: [],
+  });
+  operatorRealtimeStore.setConnection('live');
+});
+
 afterEach(() => {
+  cleanup();
   vi.restoreAllMocks();
   operatorRealtimeStore.reset();
   useOperatorStore.getState().setCommandDraft(undefined);
@@ -92,5 +108,40 @@ describe('CommandControls', () => {
     expect(input).toHaveAttribute('step', '0.5');
     fireEvent.change(input, { target: { value: '21.5' } });
     expect(screen.getByText('Draft desired').nextSibling).toHaveTextContent('21.5 °C');
+  });
+
+  it('retries an uncertain submission explicitly with the same idempotency key', async () => {
+    vi.spyOn(globalThis.crypto, 'randomUUID')
+      .mockReturnValueOnce('00000000-0000-4000-8000-000000000003')
+      .mockReturnValue('00000000-0000-4000-8000-000000000004');
+    const fetchMock = vi.fn()
+      .mockRejectedValueOnce(new TypeError('network interrupted'))
+      .mockImplementationOnce(async (_url, init) => {
+        const request = JSON.parse(init.body as string);
+        return new Response(JSON.stringify({
+          command: makeCommand('command-retried', commandDevice.id, {
+            clientRequestId: request.clientRequestId,
+            requestedAt: request.requestedAt,
+            intent: request.intent,
+          }),
+        }), { status: 200, headers: { 'content-type': 'application/json' } });
+      });
+    vi.stubGlobal('fetch', fetchMock);
+    render(<CommandControls
+      device={commandDevice}
+      telemetry={{ ...makeTelemetry(commandDevice.id, 'normal'), values: { on: true } }}
+      commands={[]}
+    />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Send command' }));
+    await screen.findByRole('button', { name: 'Retry same command' });
+    const firstRequest = JSON.parse(fetchMock.mock.calls[0]?.[1]?.body as string);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Retry same command' }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    const retriedRequest = JSON.parse(fetchMock.mock.calls[1]?.[1]?.body as string);
+    expect(retriedRequest).toEqual(firstRequest);
+    expect(operatorRealtimeStore.getSnapshot().commandsById.get('command-retried')?.state)
+      .toBe('pending');
   });
 });

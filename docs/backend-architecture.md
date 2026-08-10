@@ -1,7 +1,7 @@
 # Backend architecture
 
 - Актуально на: 2026-08-10
-- Текущий статус: Stage 7 завершён и принят; Stage 8 не начат
+- Текущий статус: объединённый Stage 8–9 завершён и принят; Stage 10 не начат
 - Назначение: живое описание реализованного backend; обновляется при каждом этапе и существенном изменении API, хранения или runtime topology.
 
 ## Роль backend
@@ -96,7 +96,7 @@ Render запускает один Node service и проверяет `/api/heal
 
 `device-catalog.ts` синхронно читает и распаковывает `west-riverside.devices-18000.json.gz`, валидирует полный `DeviceCatalog` и хранит его в памяти. Gzip-файл около 471 КБ. `selectCatalogFloors()` создаёт floor/building scope линейной фильтрацией массива.
 
-### Realtime engine, alarms и Stage 7 commands
+### Realtime engine, alarms и commands
 
 `state-snapshot.ts` отдельно от catalog вычисляет initial `DeviceTelemetry` на устройство:
 
@@ -156,6 +156,10 @@ Query scope совпадает с catalog. Ответ содержит отде�
 
 Snapshot отражает mutable engine state, поэтому `snapshotId` и `ETag` включают stream/sequence, а ответ имеет `Cache-Control: no-store`. Он является атомарной точкой восстановления, а не периодически обновляемым query cache.
 
+`StateSnapshotSchema` дополнительно запрещает duplicate telemetry/alarm/command IDs и требует,
+чтобы каждый alarm/command ссылался на устройство из telemetry scope того же snapshot. Поэтому
+повреждённый recovery document отклоняется до построения frontend indexes.
+
 ### `POST /api/v1/alarms/:alarmId/acknowledge`
 
 Body валидируется `AcknowledgeAlarmRequestSchema` и содержит `acknowledgedBy`/`acknowledgedAt`. Active alarm атомарно становится acknowledged, сохраняет автора/время и расходует один realtime sequence. Повторный запрос идемпотентно возвращает существующий acknowledged record без нового event; неизвестный ID даёт `404`, resolved alarm — `409`, schema-invalid body — `400`. Успешный response проходит `AcknowledgeAlarmResponseSchema` и имеет `Cache-Control: no-store`.
@@ -172,7 +176,7 @@ Body проходит `CreateCommandRequestSchema`. Первый запрос с
 
 После client `resume` endpoint отправляет `hello`, проверяет building/floor scope и cursor, затем синхронно отдаёт накопленный replay и подписывает socket на новые batches. Если stream изменился, cursor находится впереди server или выпал из retention window, сервер возвращает `resync.required` с причиной `streamChanged`, `serverRestart` или `cursorExpired` и snapshot path. Heartbeat отправляется каждые 5 секунд.
 
-Sequence принадлежит всему building stream. Сервер не вырезает floor-specific события из batch: иначе один общий cursor получил бы ложные gaps. Floor scope остаётся допустимым в handshake для будущей маршрутизации, но текущий Stage 7 клиент bootstrap/resume делает по зданию.
+Sequence принадлежит всему building stream. Сервер не вырезает floor-specific события из batch: иначе один общий cursor получил бы ложные gaps. Floor scope остаётся допустимым в handshake для будущей маршрутизации, но текущий клиент bootstrap/resume делает по зданию.
 
 ## Контракты и разделение данных
 
@@ -203,7 +207,7 @@ realtime engine     -> authoritative hot data + ordered replay, keyed by entity 
 
 Stage 0/3/4 routes ещё используют упрощённые `{ error, details? }`; единый `ApiError` middleware остаётся будущим улучшением. Compression применяется глобально к достаточно большим ответам, но ETag вычисляется из version/scope, а не из encoded body.
 
-## Проверки Stage 7
+## Проверки Stage 8–9
 
 API coverage проверяет:
 
@@ -224,6 +228,8 @@ Alarm coverage проверяет floor scope snapshot, наличие warning/c
 
 Command coverage проверяет все три terminal outcomes, последовательность полных `command.upsert`, delayed on/off/setpoint telemetry convergence только для `executed`, `resultTelemetryRevision`, scoped snapshot, exact-repeat idempotency, конфликт ключа, capability/setpoint/confirmation validation и HTTP create/lookup.
 
+Reliability coverage дополнительно проверяет duplicate/overlapping replay, stale telemetry/alarm/command records, gaps, stream mismatch, unknown-device events, atomic batch rejection, single-flight resync, reconnect backoff/reset и 500-event alarm burst. Contract tests проверяют duplicate IDs и dangling snapshot references; Chromium разрывает WebSocket при доступном HTTP и доказывает command polling/reconnect/replay.
+
 Production smoke проверяет compiled server, HTML, scene, catalog, snapshot, command creation и realtime batch.
 
 ## Ограничения и следующий шаг
@@ -236,4 +242,4 @@ Production smoke проверяет compiled server, HTML, scene, catalog, snaps
 - Commands, timers и idempotency index находятся в памяти процесса; restart удаляет историю и незавершённые команды.
 - Delayed telemetry convergence — synthetic fixture, а не подтверждение physical controller или модель динамики оборудования.
 
-Stage 8 не начат. При отдельном явном старте он должен проверить команды во время disconnect, неизвестные устройства, дубли/устаревшие сообщения и безопасное восстановление, не меняя границу desired/backend/actual.
+Stage 8–9 завершён и принят. Следующий Stage 10 — отдельный performance benchmark; он не начат.

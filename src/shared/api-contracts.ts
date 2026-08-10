@@ -39,7 +39,37 @@ export const StateSnapshotSchema = z.object({
   telemetry: z.array(DeviceTelemetrySchema),
   alarms: z.array(AlarmSchema),
   commands: z.array(CommandRecordSchema),
-}).strict();
+}).strict().superRefine((snapshot, context) => {
+  const telemetryIds = new Set<string>();
+  for (const telemetry of snapshot.telemetry) {
+    if (telemetryIds.has(telemetry.deviceId)) {
+      context.addIssue({ code: 'custom', message: `duplicate telemetry device ID: ${telemetry.deviceId}` });
+    }
+    telemetryIds.add(telemetry.deviceId);
+  }
+
+  const alarmIds = new Set<string>();
+  for (const alarm of snapshot.alarms) {
+    if (alarmIds.has(alarm.id)) {
+      context.addIssue({ code: 'custom', message: `duplicate alarm ID: ${alarm.id}` });
+    }
+    alarmIds.add(alarm.id);
+    if (!telemetryIds.has(alarm.deviceId)) {
+      context.addIssue({ code: 'custom', message: `alarm ${alarm.id} references an unknown device` });
+    }
+  }
+
+  const commandIds = new Set<string>();
+  for (const command of snapshot.commands) {
+    if (commandIds.has(command.id)) {
+      context.addIssue({ code: 'custom', message: `duplicate command ID: ${command.id}` });
+    }
+    commandIds.add(command.id);
+    if (!telemetryIds.has(command.deviceId)) {
+      context.addIssue({ code: 'custom', message: `command ${command.id} references an unknown device` });
+    }
+  }
+});
 
 export const AcknowledgeAlarmRequestSchema = z.object({
   acknowledgedBy: EntityIdSchema,

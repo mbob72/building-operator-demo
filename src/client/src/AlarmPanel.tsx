@@ -19,6 +19,8 @@ interface AlarmPanelProps {
   devices: DeviceMetadata[];
 }
 
+export const ALARM_PANEL_VISIBLE_LIMIT = 50;
+
 const displayTime = (value: string) => new Intl.DateTimeFormat(undefined, {
   dateStyle: 'short',
   timeStyle: 'short',
@@ -39,6 +41,7 @@ export const AlarmPanel = ({ devices }: AlarmPanelProps) => {
     state: state.alarmStateFilter,
   }), [alarmsById, state.alarmSeverityFilter, state.alarmStateFilter]);
   const counts = useMemo(() => countOpenAlarms(alarmsById.values()), [alarmsById]);
+  const visibleAlarms = alarms.slice(0, ALARM_PANEL_VISIBLE_LIMIT);
 
   if (!state.alarmPanelOpen) return null;
 
@@ -103,7 +106,7 @@ export const AlarmPanel = ({ devices }: AlarmPanelProps) => {
       </div>
       {error && <p className="alarm-panel__error" role="alert">{error}</p>}
       <div className="alarm-panel__list">
-        {alarms.map((alarm) => {
+        {visibleAlarms.map((alarm) => {
           const device = deviceById.get(alarm.deviceId);
           return (
             <article
@@ -145,6 +148,11 @@ export const AlarmPanel = ({ devices }: AlarmPanelProps) => {
             </article>
           );
         })}
+        {alarms.length > visibleAlarms.length && (
+          <p className="alarm-panel__empty" role="status">
+            Showing {visibleAlarms.length} of {alarms.length} matching alarms.
+          </p>
+        )}
         {alarms.length === 0 && <p className="alarm-panel__empty">No alarms match the filters.</p>}
       </div>
     </aside>

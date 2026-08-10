@@ -3,7 +3,7 @@
 Незакрытые межэтапные архитектурные риски и критерии их закрытия ведутся отдельно в [`architecture-todo.md`](architecture-todo.md).
 
 - Актуально на: 2026-08-10
-- Текущий статус: Stage 7 завершён и принят; Stage 8 не начат.
+- Текущий статус: объединённый Stage 8–9 завершён и принят; Stage 10 не начат.
 
 ## System boundaries
 
@@ -194,3 +194,22 @@ Stage 7 activates command contracts without coupling desired state to telemetry.
 The in-memory simulator publishes complete `command.upsert` records through the existing building sequence: `pending → accepted → executed | failed | timedOut`. The HTTP create response is reconciled into `commandsById` without moving the realtime cursor, and lifecycle rank prevents a slow `pending` response from replacing an already received `accepted` record.
 
 Only after `executed`, a separate delayed `telemetry.patch` updates the declared boolean/setpoint channel through the normal revisioned telemetry path. A following complete `command.upsert` records that applied revision in `resultTelemetryRevision`. Thus desired state, backend acceptance and actual telemetry remain separate events and stores even when the demo converges them; failed/timed-out commands never emit convergence telemetry.
+
+## Stage 8–9 implementation boundary
+
+Authoritative snapshots enforce unique hot-state IDs and same-snapshot device references. The
+frontend applies only contiguous fresh event suffixes and rejects an entire batch before publish if
+it contains an unknown device or conflicting entity identity/state. Telemetry revisions and
+alarm/command lifecycle reconciliation prevent stale records from rolling state backward.
+
+WebSocket reconnect remains cursor-based with bounded exponential backoff; concurrent resync
+signals share one snapshot request. HTTP command submission is transport-independent. While
+realtime is unavailable, accepted non-terminal commands are polled by ID. An ambiguous POST is
+never repeated automatically: an explicit operator retry reuses the exact `clientRequestId`, intent,
+timestamp and confirmation fields.
+
+Alarm bursts remain complete in operational maps but React overlays are bounded to 50 building
+rows and 10 selected-device rows. Geometry/device/alarm rendering still uses instanced deck.gl
+layers; nullable room metadata has an explicit UI fallback. Stage 8–9 includes automated evidence
+at contract, engine/API, store/client, component and Chromium levels. Stage 10 performance work is
+outside this boundary.

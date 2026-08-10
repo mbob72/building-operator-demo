@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import React, { useMemo } from 'react';
 import type { DeviceMetadata } from '../../shared/domain-contracts';
 import type { FloorSummary } from '../../shared/scene-contracts';
 import { filterAndSortAlarms } from './alarm-model';
@@ -11,6 +11,8 @@ interface DeviceCardProps {
   floors: FloorSummary[];
   onClose: () => void;
 }
+
+export const DEVICE_CARD_ALARM_LIMIT = 10;
 
 const formatValue = (value: boolean | number | string | null): string => {
   if (value === null) return '—';
@@ -29,6 +31,7 @@ export const DeviceCard = ({ device, floors, onClose }: DeviceCardProps) => {
     [...alarmsById.values()].filter((alarm) => alarm.deviceId === device.id),
     { severity: 'all', state: 'all' },
   ), [alarmsById, device.id]);
+  const visibleAlarms = alarms.slice(0, DEVICE_CARD_ALARM_LIMIT);
   const commands = useMemo(() => [...commandsById.values()].filter(
     (command) => command.deviceId === device.id,
   ), [commandsById, device.id]);
@@ -49,6 +52,7 @@ export const DeviceCard = ({ device, floors, onClose }: DeviceCardProps) => {
       <DeviceMarkerStrip device={device} status={telemetry?.status ?? 'unknown'} />
       <dl>
         <div><dt>Floor</dt><dd>{floorName.replace('West Riverside Hospital · ', '')}</dd></div>
+        <div><dt>Room</dt><dd>{device.roomId ?? 'Unassigned'}</dd></div>
         <div><dt>Type</dt><dd>{device.type}</dd></div>
         <div><dt>Protocol</dt><dd>{device.protocol}</dd></div>
         <div><dt>Origin</dt><dd>{device.dataOrigin}</dd></div>
@@ -67,13 +71,20 @@ export const DeviceCard = ({ device, floors, onClose }: DeviceCardProps) => {
       {alarms.length > 0 && (
         <div className="device-card__alarms">
           <p>ALARMS</p>
-          {alarms.map((alarm) => (
-            <div key={alarm.id} className={`device-card__alarm device-card__alarm--${alarm.state}`}>
+          {visibleAlarms.map((alarm) => (
+            <div
+              key={alarm.id}
+              className={`device-card__alarm device-card__alarm--${alarm.state}`}
+              data-testid="device-card-alarm"
+            >
               <strong>{alarm.severity} · {alarm.state}</strong>
               <span>{alarm.message}</span>
               {alarm.acknowledgedBy && <small>by {alarm.acknowledgedBy}</small>}
             </div>
           ))}
+          {alarms.length > visibleAlarms.length && (
+            <small>Showing {visibleAlarms.length} of {alarms.length} device alarms.</small>
+          )}
         </div>
       )}
       <CommandControls device={device} telemetry={telemetry} commands={commands} />

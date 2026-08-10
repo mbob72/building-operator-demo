@@ -2,7 +2,7 @@
 
 ## Текущий статус
 
-- Текущий статус: **этап 7 завершён и принят; этап 8 не начат**.
+- Текущий статус: **объединённый этап 8–9 завершён и принят; этап 10 не начат**.
 - Этапы 0–7 завершены и приняты.
 - Разработка ведётся последовательно одним coding agent.
 - Переход между этапами выполняется только после явного апрува пользователя.
@@ -87,21 +87,33 @@
 
 Реализованы capability-driven on/off и setpoint drafts, обязательный confirmation dialog для помеченных критичными capabilities, идемпотентный `POST /api/v1/commands` и lookup fallback. In-memory simulator публикует полные records по цепочке `pending → accepted → executed | failed | timedOut` в общем ordered stream. После `executed` отдельный delayed telemetry patch синтетически подтверждает requested on/off или setpoint; `failed`/`timedOut` telemetry не меняют. Карточка явно разделяет draft desired intent, backend lifecycle и actual telemetry, поэтому convergence видна как отдельное событие. Полный отчёт: `reports/stage-seven.md`.
 
-### Этап 8. Надёжность и граничные сценарии — не начат
+### Этап 8–9. Надёжность и автоматические тесты полного продукта — завершён и принят
 
 - Дублированные, устаревшие и пропущенные сообщения.
 - Команды во время disconnect.
 - Неизвестные устройства и отсутствующий `roomId`.
 - Одновременные аварии и burst при открытой карточке.
 - Безопасное восстановление после reconnect.
-
-### Этап 9. Автоматические тесты полного продукта
-
 - Unit-тесты stores, selectors, simulator и доменных переходов.
 - Contract и schema tests.
 - Компонентные тесты operator UI.
 - E2E для этажей, поиска, picking, аварий, команд и reconnect.
 - Проверки отсутствия массовых DOM-маркеров.
+
+Этап 9 включён в этап 8: граничные сценарии считаются завершёнными только вместе с
+автоматическими доказательствами на соответствующем уровне. Команда, принятая по HTTP при
+недоступном realtime, отслеживается через GET fallback. Неопределённый результат POST не
+повторяется в фоне: явный retry использует тот же idempotency key.
+
+Реализованы contract-level uniqueness и reference integrity для snapshot, atomic rejection
+unknown-device events, защита alarm/command lifecycle от stale regression, overlap replay,
+single-flight resync и безопасный reconnect. Alarm burst публикуется в store один раз, а открытые
+building/device overlays ограничены 50/10 строками с полным счётчиком. Nullable `roomId` явно
+показывается как `Unassigned`. Command draft хранит стабильные request ID/timestamp для явного
+retry; при недоступном WebSocket accepted command отслеживается GET polling без скрытой очереди.
+Chromium acceptance разрывает только WebSocket, выполняет критичную команду через HTTP, видит
+terminal state из polling, восстанавливает ordered stream и получает actual telemetry convergence.
+Полный отчёт: `reports/stage-eight-nine.md`.
 
 ### Этап 10. Performance benchmark и оптимизация
 

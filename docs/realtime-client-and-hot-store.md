@@ -1,7 +1,7 @@
 # RealtimeClient and RealtimeHotStore
 
 - Актуально на: 2026-08-10
-- Текущий статус: Stage 7 завершён и принят; Stage 8 не начат
+- Текущий статус: объединённый Stage 8–9 завершён и принят; Stage 10 не начат
 - Назначение: описание обязанностей и совместной работы двух основных realtime-классов frontend.
 
 ## Кратко
@@ -209,6 +209,8 @@ Math.min(250 * 2 ** (attempt - 1), 5_000)
 6. при ошибке записывает error и закрывает socket, чтобы reconnect повторил recovery lifecycle.
 
 Client не знает, использует loader обычный building snapshot path или путь из `resync.required`.
+Guard `resyncing` объединяет несколько одновременных gap/invalid/server resync signals в один
+authoritative HTTP request.
 
 ## RealtimeHotStore
 
@@ -352,6 +354,12 @@ commandsById ??= new Map(currentCommands)
 
 Stale device revision не откатывает данные, но stream sequence после успешной обработки всего contiguous batch всё равно продвигается.
 
+Alarm и command branches сначала требуют известный telemetry `deviceId`. Alarm reconciliation
+проверяет immutable identity, `updatedAt` и monotonic lifecycle. Command reconciliation проверяет
+immutable request fields, rank `pending < accepted < terminal`, запрещает смену terminal outcome и
+разрешает только дополнение `resultTelemetryRevision` к уже executed record. Stale records
+пропускаются с продвижением stream cursor; conflict возвращает `invalid-state` без publish всего batch.
+
 #### 4. Status и renderer state
 
 Если status изменился, логика в [`realtime-hot-store.ts:177`](../src/client/src/realtime-hot-store.ts#L177):
@@ -371,11 +379,11 @@ normal/offline/unknown ↔ warning/critical
 
 #### 5. Alarm и command upserts
 
-Alarm и command events содержат полные records и записываются по ID. Stage 6 consumers подписываются на `alarmsById`; Stage 7 `DeviceCard` подписывается на `commandsById` и локально выбирает records текущего устройства.
+Alarm и command events содержат полные records и записываются по ID. Stage 6 consumers подписываются на `alarmsById`; `DeviceCard` подписывается на `commandsById` и локально выбирает records текущего устройства.
 
 `RealtimeHotStore.upsertAlarm()` дополнительно reconciles schema-valid HTTP acknowledge response. Эта локальная copy-on-write операция меняет только `alarmsById`/`version` и намеренно не меняет `streamId` или `sequence`. Когда серверный `alarm.upsert` приходит через WebSocket, `applyBatch()` идемпотентно записывает тот же record и продвигает общий contiguous cursor. Поэтому UI не ждёт socket round-trip, но transport ordering остаётся единственным владельцем cursor.
 
-`RealtimeHotStore.upsertCommand()` выполняет такой же cursor-neutral reconciliation для HTTP create response. Дополнительный lifecycle rank `pending < accepted < terminal` защищает от race, в котором sequenced `accepted` пришёл раньше завершения HTTP request, а response всё ещё содержит `pending`. Равные и terminal states принимаются как полные authoritative records; ordered stream остаётся владельцем cursor.
+`RealtimeHotStore.upsertCommand()` выполняет такой же cursor-neutral reconciliation для HTTP create/lookup response. Lifecycle rank защищает от race, в котором sequenced `accepted` пришёл раньше завершения HTTP request, а response всё ещё содержит `pending`. Conflicting terminal outcomes не заменяют текущий record; ordered stream остаётся владельцем cursor.
 
 #### 6. Atomic publish
 
@@ -457,6 +465,9 @@ Store подключается к React через [`useRealtimeSelector`](../sr
 - Store никогда не инициирует network request.
 - Cursor хранится только в store; client читает его перед каждым resume.
 - Snapshot заменяет indexes и cursor атомарно.
+- Unknown-device/conflicting batch отклоняется до единственного publish.
+- Одновременные resync triggers выполняют один snapshot request.
+- Disconnect command polling не владеет cursor и прекращается после terminal/live.
 - Gap не исправляется локальными догадками: store возвращает result, client запускает resync.
 - Store notification происходит после полной transition.
 - Reconnect не создаёт второй authoritative state.

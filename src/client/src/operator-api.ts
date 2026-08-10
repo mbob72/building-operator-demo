@@ -10,6 +10,13 @@ import {
 } from '../../shared/api-contracts';
 import type { Alarm, CommandRecord, DeviceCatalog } from '../../shared/domain-contracts';
 
+export class CommandSubmissionError extends Error {
+  constructor(message: string, readonly outcomeUnknown: boolean) {
+    super(message);
+    this.name = 'CommandSubmissionError';
+  }
+}
+
 const scopeParameters = (floorIds?: string[]): URLSearchParams => {
   const parameters = new URLSearchParams({ buildingId: 'west-riverside' });
   for (const floorId of floorIds ?? []) parameters.append('floorIds', floorId);
@@ -63,13 +70,30 @@ export const acknowledgeAlarm = async (
 };
 
 export const createCommand = async (request: CreateCommandRequest): Promise<CommandRecord> => {
-  const response = await fetch('/api/v1/commands', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(request),
-  });
-  if (!response.ok) throw new Error(`Command request failed: ${response.status}`);
-  return CreateCommandResponseSchema.parse(await response.json()).command;
+  let response: Response;
+  try {
+    response = await fetch('/api/v1/commands', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(request),
+    });
+  } catch {
+    throw new CommandSubmissionError(
+      'Command delivery outcome is unknown. Retry explicitly with the same request ID.',
+      true,
+    );
+  }
+  if (!response.ok) {
+    throw new CommandSubmissionError(`Command request rejected: ${response.status}`, false);
+  }
+  try {
+    return CreateCommandResponseSchema.parse(await response.json()).command;
+  } catch {
+    throw new CommandSubmissionError(
+      'Command was delivered but its response was invalid. Retry explicitly with the same request ID.',
+      true,
+    );
+  }
 };
 
 export const loadCommand = async (commandId: string): Promise<CommandRecord> => {

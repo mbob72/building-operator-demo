@@ -78,7 +78,7 @@ Realtime stream не дублирует геометрию и стабильны
 
 ```json
 {
-  "streamId": "stage-7-550e8400-e29b-41d4-a716-446655440000",
+  "streamId": "stage-8-9-550e8400-e29b-41d4-a716-446655440000",
   "sequence": 1042
 }
 ```

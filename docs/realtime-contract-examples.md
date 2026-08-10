@@ -231,9 +231,9 @@ Executed state той же команды:
 
 ```json
 {
-  "snapshotId": "stage-7-live-snapshot-v1:1040:building",
+  "snapshotId": "stage-8-9-live-snapshot-v1:1040:building",
   "buildingId": "west-riverside",
-  "streamId": "stage-7-stream-2026-08-10",
+  "streamId": "stage-8-9-stream-2026-08-10",
   "sequence": 1040,
   "generatedAt": "2026-08-10T10:03:00.000Z",
   "telemetry": [
@@ -341,12 +341,12 @@ Executed state той же команды:
   "type": "resume",
   "protocolVersion": "1",
   "buildingId": "west-riverside",
-  "streamId": "stage-7-stream-2026-08-10",
+  "streamId": "stage-8-9-stream-2026-08-10",
   "afterSequence": 1040
 }
 ```
 
-Смысл: «Отдай все события stream `stage-7-stream-2026-08-10` после sequence 1040 и затем подключи меня к live updates».
+Смысл: «Отдай все события stream `stage-8-9-stream-2026-08-10` после sequence 1040 и затем подключи меня к live updates».
 
 ## Server message: hello
 
@@ -357,7 +357,7 @@ Executed state той же команды:
   "type": "hello",
   "protocolVersion": "1",
   "connectionId": "connection-c3fb11e8-92a6-4ba0-b241-127ed99c17cc",
-  "streamId": "stage-7-stream-2026-08-10",
+  "streamId": "stage-8-9-stream-2026-08-10",
   "latestSequence": 1044,
   "retentionStartSequence": 1,
   "heartbeatIntervalMs": 5000
@@ -379,7 +379,7 @@ Executed state той же команды:
 ```json
 {
   "type": "event.batch",
-  "streamId": "stage-7-stream-2026-08-10",
+  "streamId": "stage-8-9-stream-2026-08-10",
   "emittedAt": "2026-08-10T10:03:01.000Z",
   "fromSequence": 1041,
   "toSequence": 1044,
@@ -473,7 +473,7 @@ Batch constraints:
 ```json
 {
   "type": "resync.required",
-  "streamId": "stage-7-stream-2026-08-10",
+  "streamId": "stage-8-9-stream-2026-08-10",
   "latestSequence": 8000,
   "reason": "cursorExpired",
   "snapshotPath": "/api/v1/state/snapshot?buildingId=west-riverside"
@@ -495,7 +495,7 @@ Batch constraints:
 ```json
 {
   "type": "heartbeat",
-  "streamId": "stage-7-stream-2026-08-10",
+  "streamId": "stage-8-9-stream-2026-08-10",
   "latestSequence": 1044,
   "sentAt": "2026-08-10T10:03:05.000Z"
 }

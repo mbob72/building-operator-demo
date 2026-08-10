@@ -287,6 +287,8 @@ export const CommandConfirmationSchema = z.object({
 
 export const CommandDraftSchema = z.object({
   state: z.literal('draft'),
+  clientRequestId: EntityIdSchema,
+  requestedAt: TimestampSchema.nullable(),
   deviceId: EntityIdSchema,
   intent: CommandIntentSchema,
   requiresConfirmation: z.boolean(),

@@ -4,6 +4,7 @@ import { BuildingOverview } from './BuildingOverview';
 import { FloorScene } from './FloorScene';
 import { OperatorToolbar } from './OperatorToolbar';
 import { useOperatorWorkspaceModel } from './use-operator-workspace';
+import { useCommandStatusFallback } from './use-command-status-fallback';
 
 interface OperatorWorkspaceProps {
   floors: FloorSummary[];
@@ -11,6 +12,7 @@ interface OperatorWorkspaceProps {
 
 export const OperatorWorkspace = ({ floors }: OperatorWorkspaceProps) => {
   const model = useOperatorWorkspaceModel(floors);
+  useCommandStatusFallback();
 
   return (
     <>

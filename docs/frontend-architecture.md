@@ -3,7 +3,7 @@
 Подробный пошаговый путь данных от HTTP/WebSocket до компонентов и deck.gl описан в [`frontend-data-consumption.md`](frontend-data-consumption.md). Взаимодействие `RealtimeClient` и `RealtimeHotStore` разобрано отдельно в [`realtime-client-and-hot-store.md`](realtime-client-and-hot-store.md).
 
 - Актуально на: 2026-08-10
-- Текущий статус: Stage 7 завершён и принят; Stage 8 не начат
+- Текущий статус: объединённый Stage 8–9 завершён и принят; Stage 10 не начат
 - Назначение: живое описание реализованного frontend; обновляется при каждом этапе и существенном изменении data flow.
 
 ## Пользовательский результат
@@ -13,7 +13,7 @@ Frontend поддерживает два режима:
 - `Floor` — один из восьми этажей West Riverside Hospital;
 - `Building` — восемь небольших планов рядом и все 18 000 устройств.
 
-В обоих режимах работают pan, wheel/touch zoom, fit, GPU picking и одна карточка выбранного устройства. Кнопка `Alarms` стоит первой в toolbar. Панель оператора переключает этажи, ищет по имени/ID и multi-select фильтрует устройства тремя checkbox-рядами: status, protocol и type. Warning/critical alarms видны отдельным контуром на плане; оператор может отфильтровать lifecycle, перейти к устройству и подтвердить active alarm. Карточка строит command draft из capabilities, требует confirmation для критичных действий и отдельно показывает desired intent, backend lifecycle и actual telemetry.
+В обоих режимах работают pan, wheel/touch zoom, fit, GPU picking и одна карточка выбранного устройства. Кнопка `Alarms` стоит первой в toolbar. Панель оператора переключает этажи, ищет по имени/ID и multi-select фильтрует устройства тремя checkbox-рядами: status, protocol и type. Warning/critical alarms видны отдельным контуром на плане; оператор может отфильтровать lifecycle, перейти к устройству и подтвердить active alarm. Карточка строит command draft из capabilities, требует confirmation для критичных действий и отдельно показывает desired intent, backend lifecycle и actual telemetry. При потере realtime HTTP-команда остаётся явной, lifecycle временно отслеживается polling, а reconnect продолжает ordered stream от последнего применённого cursor.
 
 ## Компонентная схема
 
@@ -192,6 +192,24 @@ Operational snapshot больше не имеет query key: `operator-queries.t
 
 Карточка показывает не более пяти последних commands устройства. Каждая запись содержит три отдельные строки: immutable desired intent, backend state и independently selected actual telemetry. Сначала `executed` меняет backend badge; только более поздний `telemetry.patch` меняет `Actual`. Frontend никогда не подставляет intent в telemetry самостоятельно.
 
+## Stage 8–9 reliability boundary
+
+`RealtimeHotStore` применяет batch атомарно и reconciles alarm/command records монотонно. Полный
+duplicate и stale entity revision не меняют domain data; overlap batch применяет только свежий
+contiguous suffix. Gap, changed stream, unknown-device reference, conflicting alarm identity или
+terminal command outcome возвращают recovery result до publish, поэтому частичный batch не виден
+ни одному subscriber. `RealtimeClient` coalesces одновременные resync triggers одним snapshot request.
+
+`CommandDraft` содержит стабильные `clientRequestId` и nullable `requestedAt`. Первая попытка
+фиксирует timestamp; неопределённый network/response outcome оставляет exact request для явной
+кнопки `Retry same command`. Background resubmit запрещён. `useCommandStatusFallback` при любом
+не-live connection status опрашивает все известные non-terminal commands через GET и прекращает
+polling при terminal state или возвращении realtime.
+
+Alarm maps сохраняют все записи и полные counts, но `AlarmPanel` рендерит максимум 50 строк, а
+`DeviceCard` — 10 alarms выбранного устройства. Это ограничивает DOM work во время burst, не
+удаляя operational state. Карточка также явно показывает nullable `roomId` как `Unassigned`.
+
 ## Floor и building rendering
 
 ### FloorScene
@@ -341,13 +359,13 @@ Hover использует штатный deck.gl picking и создаёт ро
 - Chromium E2E проверяет рост live cursor вместе с floor switch, filters, overview, zoom, GPU picking и live device card.
 - Alarm selector/component tests проверяют severity/state filters, device type/protocol/status markers, priority marker selection, acknowledge reconciliation и atomic navigation; Chromium проходит полный acknowledge/locate workflow и проверяет markers в списке и выбранной карточке.
 - Command component/hot-store tests проверяют on/off/setpoint drafts, explicit confirmation, desired/backend/actual separation и защиту lifecycle от HTTP regression; Chromium проходит confirmable command до `executed`.
+- Reliability tests проверяют overlap/duplicate/stale/gap/unknown state, atomic 500-alarm burst, bounded overlays, nullable room, single-flight resync, stable idempotent retry и command GET fallback. Chromium разрывает WebSocket при доступном HTTP, получает terminal command через polling и затем восстанавливает ordered stream/actual telemetry.
 
 ## Ограничения и следующий шаг
 
 - Catalog и authoritative hot snapshot передаются для здания; локальный floor subset не требует сети. Device spatial culling/clustering не добавлялись без benchmark.
 - Overview делает до восьми scene queries на новый zoom band; ответы кешируются, но пока не объединены в отдельный backend batch endpoint.
 - Главный JS chunk около 1 МБ minified из-за deck.gl; code splitting оставлен как измеряемая оптимизация, а не блокер MVP.
-- Browser-level forced disconnect/resync пока покрыт детерминированными client/API tests; Chromium acceptance проверяет штатный live stream.
-- Command submission во время disconnect и polling fallback UI относятся к Stage 8; Stage 7 реализует GET fallback contract/client function, но normal UI использует ordered realtime.
+- Realtime replay, command records и idempotency остаются process-local; browser recovery не превращает их в durable delivery.
 
-Stage 8 не начат. При отдельном явном старте он должен усилить duplicate/stale/gap и disconnect command scenarios, сохранив separate command/telemetry stores.
+Stage 8–9 завершён и принят. Stage 10 performance benchmark не начат.

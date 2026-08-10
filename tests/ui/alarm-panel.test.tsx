@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { AlarmPanel } from '../../src/client/src/AlarmPanel';
+import { AlarmPanel, ALARM_PANEL_VISIBLE_LIMIT } from '../../src/client/src/AlarmPanel';
 import { useOperatorStore } from '../../src/client/src/operator-store';
 import { operatorRealtimeStore } from '../../src/client/src/realtime-hot-store';
 import {
@@ -47,6 +47,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  cleanup();
   vi.unstubAllGlobals();
   operatorRealtimeStore.reset();
 });
@@ -94,5 +95,27 @@ describe('AlarmPanel', () => {
       protocolFilters: [...DeviceProtocolSchema.options],
       statusFilters: [...DeviceStatusSchema.options],
     });
+  });
+
+  it('bounds building-list DOM work during an alarm burst', () => {
+    const alarms = Array.from({ length: 80 }, (_, index) => (
+      makeAlarm(`alarm-burst-${index}`, index % 2 === 0 ? 'device-1' : 'device-2')
+    ));
+    operatorRealtimeStore.replaceSnapshot({
+      snapshotId: 'snapshot-alarm-burst',
+      buildingId: 'west-riverside',
+      streamId: 'stream-1',
+      sequence: 20,
+      generatedAt: timestamp,
+      telemetry: [makeTelemetry('device-1', 'warning'), makeTelemetry('device-2', 'critical')],
+      alarms,
+      commands: [],
+    });
+
+    render(<AlarmPanel devices={devices} />);
+
+    expect(screen.getAllByTestId('alarm-row')).toHaveLength(ALARM_PANEL_VISIBLE_LIMIT);
+    expect(screen.getByText(`Showing ${ALARM_PANEL_VISIBLE_LIMIT} of 80 matching alarms.`))
+      .toBeVisible();
   });
 });

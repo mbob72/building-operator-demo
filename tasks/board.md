@@ -70,6 +70,25 @@
 - [x] Present Stage 4 for approval.
 - [ ] Receive explicit Stage 4 approval.
 
+## Stages 5–7
+
+- [x] Complete and receive explicit approval for ordered realtime state (Stage 5).
+- [x] Complete and receive explicit approval for alarms (Stage 6).
+- [x] Complete and receive explicit approval for simulated commands (Stage 7).
+
+## Combined Stage 8–9 — reliability and full-product automated acceptance
+
+- [x] Receive explicit user approval to start combined Stage 8–9.
+- [x] Define disconnect command safety and idempotent retry policy.
+- [x] Harden duplicate, stale, gap, stream-change, and reconnect recovery.
+- [x] Handle unknown devices and nullable `roomId` without corrupting UI state.
+- [x] Preserve selection and operator state during alarm bursts.
+- [x] Add command lookup fallback while realtime is unavailable.
+- [x] Complete unit, contract, API, component, E2E, and DOM-cardinality coverage.
+- [x] Update frontend/backend architecture and Stage 8–9 report.
+- [x] Run full verification and browser acceptance.
+- [x] Present combined Stage 8–9 and receive explicit approval.
+
 ## Later stages
 
-Blocked until explicit user approval after Stage 4.
+Stage 10 performance work remains blocked until explicit approval after Stage 8–9.

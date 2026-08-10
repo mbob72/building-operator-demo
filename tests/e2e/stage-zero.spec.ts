@@ -1,6 +1,17 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type WebSocketRoute } from '@playwright/test';
 
 test('streams live state while switching floors, filtering, overviewing, and GPU picking', async ({ page }) => {
+  test.setTimeout(90_000);
+  let realtimeAvailable = true;
+  let activeRealtimeRoute: WebSocketRoute | undefined;
+  await page.routeWebSocket('**/api/v1/realtime', (route) => {
+    activeRealtimeRoute = route;
+    if (!realtimeAvailable) {
+      void route.close({ code: 1012, reason: 'Stage 8 disconnect fixture' });
+      return;
+    }
+    route.connectToServer();
+  });
   await page.goto('/');
   const realtimeStatus = page.getByTestId('realtime-status');
   await expect(realtimeStatus).toHaveText(/live · #\d+/);
@@ -73,12 +84,18 @@ test('streams live state while switching floors, filtering, overviewing, and GPU
   const targetCatalog = await page.request.get(
     '/api/v1/catalog?buildingId=west-riverside&floorIds=west-riverside-level-2',
   );
-  const targetDevices = (await targetCatalog.json()).devices as Array<{
-    id: string;
-    capabilities: {
-      commands: Array<{ kind: string; requiresConfirmation: boolean }>;
-    };
-  }>;
+  const targetCatalogPayload = await targetCatalog.json() as {
+    floors: Array<{ id: string; bounds: [number, number, number, number] }>;
+    devices: Array<{
+      id: string;
+      floorId: string;
+      position: { x: number; y: number };
+      capabilities: {
+        commands: Array<{ kind: string; requiresConfirmation: boolean }>;
+      };
+    }>;
+  };
+  const targetDevices = targetCatalogPayload.devices;
   const targetDevice = targetDevices.at(-1);
   if (!targetDevice) throw new Error('Level 2 catalog is empty');
   await page.getByRole('searchbox', { name: 'Search' }).fill(targetDevice.id);
@@ -113,11 +130,24 @@ test('streams live state while switching floors, filtering, overviewing, and GPU
   if (!box) throw new Error('DeckGL canvas has no bounding box');
   const deviceCard = page.getByRole('complementary', { name: 'Selected device' });
   const deviceTooltip = page.getByTestId('scene-device-tooltip');
+  const targetFloor = targetCatalogPayload.floors.find((floor) => floor.id === commandDevice.floorId);
+  if (!targetFloor) throw new Error('Command device floor is missing from the catalog');
+  const [minX, minY, maxX, maxY] = targetFloor.bounds;
+  const scale = Math.min(box.width / (maxX - minX), box.height / (maxY - minY)) * 0.86;
+  const projectedX = box.x + box.width / 2
+    + (commandDevice.position.x - (minX + maxX) / 2) * scale;
+  const projectedY = box.y + box.height / 2
+    - (commandDevice.position.y - (minY + maxY) / 2) * scale;
+  const candidates = [
+    { x: projectedX, y: projectedY },
+    { x: projectedX, y: box.y + box.height - (projectedY - box.y) },
+  ];
   let hoveredPoint: { x: number; y: number } | undefined;
-  for (let y = 70; y < box.height - 70 && !hoveredPoint; y += 12) {
-    for (let x = 70; x < box.width - 70 && !hoveredPoint; x += 12) {
-      await page.mouse.move(box.x + x, box.y + y);
-      if (await deviceTooltip.count() > 0) hoveredPoint = { x: box.x + x, y: box.y + y };
+  for (const candidate of candidates) {
+    await page.mouse.move(candidate.x, candidate.y);
+    if (await deviceTooltip.count() > 0) {
+      hoveredPoint = candidate;
+      break;
     }
   }
   if (!hoveredPoint) throw new Error('No hoverable device was found on the scene');
@@ -138,6 +168,10 @@ test('streams live state while switching floors, filtering, overviewing, and GPU
   const desiredText = desiredValue.toUpperCase();
   await deviceCard.getByRole('combobox', { name: 'Desired state' }).selectOption(desiredValue);
   await expect(deviceCard.getByText('Draft desired').locator('..')).toContainText(desiredText);
+  realtimeAvailable = false;
+  await activeRealtimeRoute?.close({ code: 1012, reason: 'Stage 8 disconnect fixture' });
+  await expect(realtimeStatus).toHaveText(/reconnecting/);
+  await expect(deviceCard.getByRole('status')).toContainText('HTTP submission remains explicit');
   await deviceCard.getByRole('button', { name: 'Review command' }).click();
   const confirmation = page.getByRole('dialog', { name: 'Potentially critical command' });
   await expect(confirmation).toBeVisible();
@@ -148,6 +182,8 @@ test('streams live state while switching floors, filtering, overviewing, and GPU
   await expect(recentCommands).toContainText(/Backend: (pending|accepted|executed)/);
   await expect(recentCommands).toContainText('Actual:');
   await expect(recentCommands).toContainText('Backend: executed', { timeout: 5_000 });
+  realtimeAvailable = true;
+  await expect(realtimeStatus).toHaveText(/live · #\d+/, { timeout: 10_000 });
   await expect(recentCommands).toContainText(`Actual: ${desiredText}`, { timeout: 6_000 });
   await page.getByRole('button', { name: 'Close device card' }).click();
   await expect(deviceCard).toHaveCount(0);

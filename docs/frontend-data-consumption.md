@@ -3,7 +3,7 @@
 Внутренняя работа и граница ответственности двух realtime-классов подробно описана в [`realtime-client-and-hot-store.md`](realtime-client-and-hot-store.md).
 
 - Актуально на: 2026-08-10
-- Текущий статус: Stage 7 завершён и принят; Stage 8 не начат
+- Текущий статус: объединённый Stage 8–9 завершён и принят; Stage 10 не начат
 - Назначение: пошаговое описание пути данных от HTTP/WebSocket до React-компонентов и deck.gl layers.
 
 ## Итоговая схема
@@ -37,6 +37,10 @@ POST /api/v1/commands
         → validated pending CommandRecord
         → hot-store reconciliation (cursor unchanged)
         ← later sequenced command.upsert lifecycle
+
+GET /api/v1/commands/:id while realtime != live
+        → non-terminal command polling
+        → hot-store reconciliation (cursor unchanged)
 ```
 
 Geometry, stable metadata, hot operational state и UI-only state не объединяются в один transport document или общий frontend store.
@@ -60,7 +64,7 @@ Geometry, stable metadata, hot operational state и UI-only state не объе�
 - [`loadStateSnapshotPath(path, signal)`](../src/client/src/operator-api.ts#L40) загружает snapshot по пути из `resync.required`.
 - [`acknowledgeAlarm(alarmId, request)`](../src/client/src/operator-api.ts) вызывает mutation endpoint и валидирует `AcknowledgeAlarmResponse`.
 - [`createCommand(request)`](../src/client/src/operator-api.ts) отправляет idempotent mutation и валидирует `CreateCommandResponse`;
-- [`loadCommand(commandId)`](../src/client/src/operator-api.ts) предоставляет GET fallback для Stage 8 disconnect handling.
+- [`loadCommand(commandId)`](../src/client/src/operator-api.ts) предоставляет GET fallback для disconnect handling.
 
 Каждый JSON-ответ проходит runtime Zod parsing через `CatalogResponseSchema` или `StateSnapshotSchema`. Невалидный payload не попадает в query cache или hot store.
 
@@ -136,7 +140,7 @@ Store также сохраняет:
   "type": "resume",
   "protocolVersion": "1",
   "buildingId": "west-riverside",
-  "streamId": "stage-7-…",
+  "streamId": "stage-8-9-…",
   "afterSequence": 1200
 }
 ```
@@ -158,7 +162,7 @@ Telemetry patch мержится с текущим объектом, включ�
 
 ## 8. Alarm lifecycle consumption
 
-Snapshot indexing and `alarm.upsert` both replace a complete record in `alarmsById`. [`AlarmPanel`](../src/client/src/AlarmPanel.tsx) subscribes to this map and `statusByDeviceId`, а [`alarm-model.ts`](../src/client/src/alarm-model.ts) чисто выполняет severity/state filtering, operational sorting, counts и выбор strongest unresolved alarm per device. Для каждой строки `deviceId` связывает alarm со stable `DeviceMetadata` из building catalog; [`DeviceVisualMarkers`](../src/client/src/DeviceVisualMarkers.tsx) показывает type icon и protocol badge из metadata, а status square — из актуального hot-state index. Alarm severity/state визуально и семантически не заменяют telemetry status.
+Snapshot indexing and `alarm.upsert` both reconcile a complete record in `alarmsById`. [`AlarmPanel`](../src/client/src/AlarmPanel.tsx) subscribes to this map and `statusByDeviceId`, а [`alarm-model.ts`](../src/client/src/alarm-model.ts) чисто выполняет severity/state filtering, operational sorting, counts и выбор strongest unresolved alarm per device. Для каждой строки `deviceId` связывает alarm со stable `DeviceMetadata` из building catalog; [`DeviceVisualMarkers`](../src/client/src/DeviceVisualMarkers.tsx) показывает type icon и protocol badge из metadata, а status square — из актуального hot-state index. Alarm severity/state визуально и семантически не заменяют telemetry status. После сортировки building panel рендерит максимум 50 строк, selected card — 10; counts и records остаются полными.
 
 При `Acknowledge` transport client получает schema-valid Alarm и вызывает [`RealtimeHotStore.upsertAlarm()`](../src/client/src/realtime-hot-store.ts). Это немедленно показывает accepted author/time, но сохраняет realtime `sequence`: только ordered `alarm.upsert` из socket двигает cursor. Если socket event пришёл раньше HTTP response, повторная запись того же полного record ничего не меняет.
 
@@ -166,9 +170,15 @@ Renderer получает полный scoped список устройств о
 
 ## 9. Command lifecycle consumption
 
-`DeviceCard` выбирает только commands текущего `deviceId` из `commandsById`. [`CommandControls`](../src/client/src/CommandControls.tsx) строит UI-only `CommandDraft` из stable capability и хранит его в Zustand; backend никогда не получает или не возвращает state `draft`.
+`DeviceCard` выбирает только commands текущего `deviceId` из `commandsById`. [`CommandControls`](../src/client/src/CommandControls.tsx) строит UI-only `CommandDraft` из stable capability и хранит его в Zustand; backend никогда не получает или не возвращает state `draft`. Draft сохраняет `clientRequestId` и первый `requestedAt`, чтобы явный retry неопределённого POST был exact idempotent repeat.
 
 Submission выполняется напрямую или после explicit confirmation dialog. Schema-valid REST response reconciles через `upsertCommand()` без изменения cursor. Если ordered `accepted` уже пришёл раньше более медленного HTTP `pending`, lifecycle rank сохраняет более новый record. Последующие complete `command.upsert` применяются обычным batch path.
+
+[`useCommandStatusFallback`](../src/client/src/use-command-status-fallback.ts) активен на уровне
+`OperatorWorkspace`, поэтому не зависит от открытой карточки. Пока connection не `live`, hook
+опрашивает известные non-terminal IDs каждые 500 мс. Poll response не двигает cursor; terminal state
+или восстановленный WebSocket останавливает polling. Network-ambiguous POST никогда не попадает в
+background queue и повторяется только явной кнопкой с exact request payload.
 
 В command form/history три значения не мержатся:
 
@@ -312,6 +322,7 @@ Alarm volume мал и обновляется существенно реже te
 | [`use-realtime-state.ts:7`](../src/client/src/use-realtime-state.ts#L7) | direct bootstrap lifecycle и React selectors |
 | [`realtime-client.ts:37`](../src/client/src/realtime-client.ts#L37) | WebSocket resume/reconnect/recovery |
 | [`realtime-hot-store.ts:65`](../src/client/src/realtime-hot-store.ts#L65) | authoritative indexed client state и batch application |
+| [`use-command-status-fallback.ts`](../src/client/src/use-command-status-fallback.ts) | cursor-neutral GET polling non-terminal commands при degraded realtime |
 | [`use-operator-workspace.ts`](../src/client/src/use-operator-workspace.ts) | building catalog, local floor/status filtering и renderer view model |
 | [`OperatorWorkspace.tsx:11`](../src/client/src/OperatorWorkspace.tsx#L11) | распределение renderer-relevant props |
 | [`OperatorToolbar.tsx`](../src/client/src/OperatorToolbar.tsx) | connection/cursor и active alarm count consumer |
@@ -336,6 +347,9 @@ Alarm volume мал и обновляется существенно реже te
 - Value-only update не пересобирает device layers.
 - Update одного устройства не рендерит карточку другого устройства.
 - HTTP acknowledgement не двигает realtime cursor; socket event двигает его ровно один раз.
+- HTTP command create/lookup не двигает realtime cursor и не может откатить lifecycle.
+- Неопределённый POST не повторяется автоматически; explicit retry сохраняет exact idempotency payload.
+- Unknown-device/conflicting event отклоняет весь batch до publish и запускает resync.
 - Resolved alarm не рисуется на плане, но сохраняется в списке и audit view.
 - Device filters не скрывают unresolved alarm contour.
 - Geometry, metadata, hot state и UI state остаются раздельными.

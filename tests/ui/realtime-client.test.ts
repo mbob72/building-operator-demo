@@ -202,8 +202,97 @@ describe('RealtimeClient', () => {
 
     scheduled[0]!.callback();
     expect(sockets).toHaveLength(2);
+    sockets[1]!.open();
+    expect(JSON.parse(sockets[1]!.sent[0]!)).toMatchObject({
+      type: 'resume',
+      streamId: 'stream-1',
+      afterSequence: 10,
+    });
+    sockets[1]!.receive({
+      type: 'hello',
+      protocolVersion: '1',
+      connectionId: 'connection-recovered',
+      streamId: 'stream-1',
+      latestSequence: 10,
+      retentionStartSequence: 1,
+      heartbeatIntervalMs: 5_000,
+    });
+    expect(store.getSnapshot().connectionStatus).toBe('live');
     sockets[1]!.close();
-    expect(scheduled[1]?.delay).toBe(500);
+    expect(scheduled[1]?.delay).toBe(250);
+    client.stop();
+  });
+
+  it('resyncs atomically when a batch references an unknown device', async () => {
+    const store = new RealtimeHotStore();
+    store.replaceSnapshot(snapshot());
+    const socket = new FakeSocket();
+    const loadSnapshot = vi.fn().mockResolvedValue(snapshot(50));
+    const client = new RealtimeClient({
+      store,
+      loadSnapshot,
+      createSocket: () => socket,
+      realtimeUrl: 'ws://test/realtime',
+    });
+    client.start();
+    socket.open();
+
+    socket.receive({
+      type: 'event.batch',
+      streamId: 'stream-1',
+      emittedAt: timestamp,
+      fromSequence: 11,
+      toSequence: 11,
+      events: [{
+        sequence: 11,
+        event: {
+          type: 'telemetry.patch',
+          payload: {
+            deviceId: 'device-unknown',
+            revision: 1,
+            observedAt: timestamp,
+            receivedAt: timestamp,
+            values: { temperature: 25 },
+          },
+        },
+      }],
+    });
+
+    await vi.waitFor(() => expect(store.getSnapshot().sequence).toBe(50));
+    expect(loadSnapshot).toHaveBeenCalledOnce();
+    expect(store.getSnapshot().telemetryByDeviceId.has('device-unknown')).toBe(false);
+    client.stop();
+  });
+
+  it('coalesces concurrent resync signals into one authoritative snapshot request', async () => {
+    const store = new RealtimeHotStore();
+    store.replaceSnapshot(snapshot());
+    const socket = new FakeSocket();
+    let resolveSnapshot!: (value: StateSnapshot) => void;
+    const loadSnapshot = vi.fn().mockReturnValue(new Promise<StateSnapshot>((resolve) => {
+      resolveSnapshot = resolve;
+    }));
+    const client = new RealtimeClient({
+      store,
+      loadSnapshot,
+      createSocket: () => socket,
+      realtimeUrl: 'ws://test/realtime',
+    });
+    client.start();
+    socket.open();
+    const resyncMessage = {
+      type: 'resync.required',
+      streamId: 'stream-1',
+      latestSequence: 50,
+      reason: 'cursorExpired',
+      snapshotPath: '/api/v1/state/snapshot?buildingId=west-riverside',
+    };
+
+    socket.receive(resyncMessage);
+    socket.receive(resyncMessage);
+    expect(loadSnapshot).toHaveBeenCalledOnce();
+    resolveSnapshot(snapshot(50));
+    await vi.waitFor(() => expect(store.getSnapshot().sequence).toBe(50));
     client.stop();
   });
 });

@@ -87,3 +87,15 @@ The frontend sends the explicit mock actor ID `demo-operator` and a browser UTC 
 ## A-018 Building catalog for alarm navigation
 
 Stage 6 keeps the 18,000-device stable catalog building-scoped in the browser and derives the selected floor locally. This intentionally trades a larger cache document for immediate navigation from a building-wide alarm list without request races. Pagination, floor indexes or on-demand metadata can replace this after Stage 10 measurements without changing alarm/device IDs.
+
+## A-019 Commands while realtime is unavailable
+
+The command REST API and the ordered WebSocket are independent transport paths. A command may
+therefore be submitted while realtime is reconnecting if HTTP remains available. After a successful
+POST, the frontend polls the command lookup endpoint until a terminal state is observed or realtime
+becomes live again.
+
+If POST fails at the network boundary, the browser cannot know whether the server accepted it. The
+draft retains one stable `clientRequestId` and offers an explicit retry with that same idempotency
+key. The frontend never queues or automatically resubmits the command after reconnect. This is a
+safety property, not an offline command queue.

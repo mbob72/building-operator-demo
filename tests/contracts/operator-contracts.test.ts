@@ -151,6 +151,8 @@ describe('operator domain contracts', () => {
   it('separates a UI command draft from a backend command record', () => {
     const draft = {
       state: 'draft',
+      clientRequestId: 'draft-request-1',
+      requestedAt: null,
       deviceId: device.id,
       intent: { kind: 'setOnOff', value: false },
       requiresConfirmation: false,
@@ -189,6 +191,32 @@ describe('operator domain contracts', () => {
 
     expect(snapshot.sequence).toBe(100);
     expect(snapshot.telemetry[0]?.deviceId).toBe(device.id);
+  });
+
+  it('rejects duplicate hot-state IDs and unknown snapshot device references', () => {
+    const base = {
+      snapshotId: 'snapshot-invalid',
+      buildingId: 'west-riverside',
+      streamId: 'stream-1',
+      sequence: 100,
+      generatedAt: timestamp,
+      telemetry: [telemetry],
+      alarms: [alarm],
+      commands: [command],
+    };
+
+    expect(StateSnapshotSchema.safeParse({
+      ...base,
+      telemetry: [telemetry, telemetry],
+    }).success).toBe(false);
+    expect(StateSnapshotSchema.safeParse({
+      ...base,
+      alarms: [{ ...alarm, deviceId: 'device-unknown' }],
+    }).success).toBe(false);
+    expect(StateSnapshotSchema.safeParse({
+      ...base,
+      commands: [{ ...command, deviceId: 'device-unknown' }],
+    }).success).toBe(false);
   });
 });
 
